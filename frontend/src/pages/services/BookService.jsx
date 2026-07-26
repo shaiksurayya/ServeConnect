@@ -1,108 +1,160 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { services } from '../../data/services.js'
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function BookService() {
-  const { id } = useParams()
-  const navigate = useNavigate()
-  const service = services.find((s) => s.id === Number(id))
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  const [form, setForm] = useState({ date: '', time: '', address: '' })
-  const [confirmed, setConfirmed] = useState(false)
+  const [service, setService] = useState(null);
+
+  const [form, setForm] = useState({
+    date: "",
+    time: "",
+    address: "",
+  });
+
+  const [confirmed, setConfirmed] = useState(false);
+
+  useEffect(() => {
+    fetch(`http://localhost:8080/api/services/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Loaded Service:", data);
+        setService(data);
+      })
+      .catch((err) => console.log(err));
+  }, [id]);
 
   if (!service) {
     return (
-      <div className="max-w-md mx-auto px-6 py-16 text-center">
-        <p className="text-sm text-sub">Service not found.</p>
-        <button onClick={() => navigate('/services')} className="text-sm text-primary font-medium mt-3">
-          Back to services
-        </button>
+      <div className="text-center mt-10">
+        <h2>Loading...</h2>
       </div>
-    )
+    );
   }
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value,
+    });
+  };
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    // TODO: POST to /bookings once backend is ready — matches booking_date, booking_time, service_address, payment_method
-    setConfirmed(true)
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    const bookingData = {
+      customerId: user.userId,
+      providerId: service.providerId,
+      serviceId: service.serviceId,
+      bookingDate: form.date,
+      bookingTime: form.time,
+      address: form.address,
+    };
+
+    console.log("Sending Booking:", bookingData);
+
+    try {
+      const response = await fetch("http://localhost:8080/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      if (!response.ok) {
+        alert("Booking Failed");
+        return;
+      }
+
+      const result = await response.json();
+
+      console.log("Booking Success:", result);
+
+      setConfirmed(true);
+    } catch (err) {
+      console.log(err);
+      alert("Booking Failed");
+    }
+  };
 
   if (confirmed) {
     return (
-      <div className="bg-surface min-h-[calc(100vh-73px)] flex items-center justify-center px-6">
-        <div className="bg-white border border-line rounded-2xl p-8 text-center max-w-sm">
-          <div className="text-4xl mb-3">✅</div>
-          <h1 className="font-display font-700 text-xl text-ink">Booking confirmed</h1>
-          <p className="text-sm text-sub mt-2">
-            {service.title} with {service.provider} on {form.date} at {form.time}. Pay on service completion.
+      <div className="bg-surface min-h-screen flex items-center justify-center">
+        <div className="bg-white p-8 rounded-xl border text-center">
+          <h2 className="text-2xl font-bold mb-3">✅ Booking Confirmed</h2>
+
+          <p>
+            {service.title} booked successfully.
           </p>
+
           <button
-            onClick={() => navigate('/bookings')}
-            className="mt-6 text-sm font-medium text-white bg-primary rounded-lg px-4 py-2 hover:bg-primaryDark transition-colors"
+            onClick={() => navigate("/bookings")}
+            className="mt-5 bg-primary text-white px-4 py-2 rounded"
           >
-            View my bookings
+            View My Bookings
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="bg-surface min-h-[calc(100vh-73px)]">
-      <div className="max-w-md mx-auto px-6 py-12">
-        <div className="bg-white border border-line rounded-2xl p-6">
-          <h1 className="font-display font-700 text-xl text-ink">{service.title}</h1>
-          <div className="flex items-center justify-between mt-2 text-sm">
-            <span className="text-sub">Provider: <span className="text-ink font-medium">{service.provider}</span></span>
-            <span className="text-amber">{'★'.repeat(service.rating)}{'☆'.repeat(5 - service.rating)}</span>
-          </div>
+    <div className="max-w-lg mx-auto mt-10 bg-white p-6 rounded-xl border">
 
-          <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-            <div>
-              <label className="text-sm text-sub">Date</label>
-              <input
-                name="date" type="date" required value={form.date} onChange={handleChange}
-                className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-sub">Time</label>
-              <select
-                name="time" required value={form.time} onChange={handleChange}
-                className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-primary"
-              >
-                <option value="">Select a slot</option>
-                <option>9:00 AM</option>
-                <option>11:00 AM</option>
-                <option>2:00 PM</option>
-                <option>4:30 PM</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-sub">Address</label>
-              <textarea
-                name="address" required rows={2} value={form.address} onChange={handleChange}
-                placeholder="House no, street, city"
-                className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary resize-none"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-sub">Payment</label>
-              <div className="mt-1 border border-line rounded-lg px-3 py-2 text-sm bg-surface text-sub">
-                Cash on service (₹{service.price})
-              </div>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-primaryDark transition-colors"
-            >
-              Confirm Booking
-            </button>
-          </form>
-        </div>
-      </div>
+      <h2 className="text-2xl font-bold">
+        {service.title}
+      </h2>
+
+      <p className="mt-2">
+        Provider : {service.providerName}
+      </p>
+
+      <p className="mb-4">
+        Price : ₹{service.price}
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+
+        <input
+          type="date"
+          name="date"
+          value={form.date}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          required
+        />
+
+        <input
+          type="time"
+          name="time"
+          value={form.time}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          required
+        />
+
+        <textarea
+          name="address"
+          value={form.address}
+          onChange={handleChange}
+          placeholder="Address"
+          className="w-full border p-2 rounded"
+          required
+        />
+
+        <button
+          type="submit"
+          className="w-full bg-primary text-white p-2 rounded"
+        >
+          Confirm Booking
+        </button>
+
+      </form>
+
     </div>
-  )
+  );
 }

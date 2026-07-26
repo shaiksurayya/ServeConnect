@@ -21,7 +21,7 @@ try {
   localStorage.removeItem("user")
 }
 
-const userId = user?.id
+const userId = user?.userId
 const token = localStorage.getItem("token")
   useEffect(() => {
     if (userId) {

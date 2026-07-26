@@ -1,15 +1,31 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { services as allServices } from '../../data/services.js'
+import { useState, useEffect } from "react";
 
 const categories = ['AC Repair', 'Electrician', 'Tutor', 'Beautician', 'Plumbing']
 
 export default function Services() {
   const navigate = useNavigate()
+  const [allServices, setAllServices] = useState([]);
   const [search, setSearch] = useState('')
   const [selectedCategories, setSelectedCategories] = useState([])
   const [maxPrice, setMaxPrice] = useState(1000)
   const [minRating, setMinRating] = useState(0)
+
+  useEffect(() => {
+  fetch("http://localhost:8080/api/services")
+    .then((response) => {
+      console.log("Status:", response.status);
+      return response.json();
+    })
+    .then((data) => {
+      console.log("Services from backend:", data);
+      console.log("Length:", data.length);
+      setAllServices(data);
+    })
+    .catch((error) => {
+      console.log("Error:", error);
+    });
+}, []);
 
   const toggleCategory = (cat) => {
     setSelectedCategories((prev) =>
@@ -17,13 +33,15 @@ export default function Services() {
     )
   }
 
-  const filtered = allServices.filter((s) => {
-    const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase())
-    const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(s.category)
-    const matchesPrice = s.price <= maxPrice
-    const matchesRating = s.rating >= minRating
-    return matchesSearch && matchesCategory && matchesPrice && matchesRating
-  })
+  // const filtered = allServices.filter((s) => {
+  //   const matchesSearch = s.title.toLowerCase().includes(search.toLowerCase())
+  //   const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(s.categoryName)
+  //   const matchesPrice = s.price <= maxPrice
+  //   const matchesRating = true;
+  //   return matchesSearch && matchesCategory && matchesPrice && matchesRating
+  // })
+
+  const filtered = allServices;
 
   return (
     <div className="bg-surface min-h-[calc(100vh-73px)]">
@@ -93,19 +111,19 @@ export default function Services() {
           </h1>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((s) => (
-              <div key={s.id} className="bg-white border border-line rounded-xl p-5">
+              <div key={s.serviceId} className="bg-white border border-line rounded-xl p-5">
                 <div className="text-sm font-semibold text-ink">{s.title}</div>
-                <div className="text-amber text-sm mt-1">
-                  {'★'.repeat(s.rating)}{'☆'.repeat(5 - s.rating)}
-                </div>
+                <div className="text-sm text-sub mt-1">
+  Provider: {s.providerName}
+</div>
                 <div className="text-lg font-display font-700 text-ink mt-2">₹{s.price}</div>
-                <div className="text-xs text-sub mt-0.5">{s.duration}</div>
-                <div className={`text-xs font-medium mt-1 ${s.available ? 'text-green-600' : 'text-red-500'}`}>
-                  {s.available ? 'Available' : 'Currently unavailable'}
+                <div className="text-xs text-sub mt-0.5">{s.duration} mins</div>
+                <div className={`text-xs font-medium mt-1 ${s.availability ? 'text-green-600' : 'text-red-500'}`}>
+                  {s.availability ? 'Available' : 'Currently unavailable'}
                 </div>
                 <button
-                  onClick={() => navigate(`/book/${s.id}`)}
-                  disabled={!s.available}
+                  onClick={() => navigate(`/book/${s.serviceId}`)}
+                  disabled={!s.availability}
                   className="w-full mt-4 text-sm font-medium text-white bg-primary rounded-lg py-2 hover:bg-primaryDark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Book Now
