@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import StatCard from "../../components/ui/StatCard";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function ProviderDashboard() {
   const navigate = useNavigate();
@@ -171,7 +172,8 @@ export default function ProviderDashboard() {
       </div>
     );
   }
-    return (
+
+  return (
     <div className="bg-surface min-h-[calc(100vh-73px)]">
       <div className="max-w-6xl mx-auto px-6 py-10">
 
@@ -195,6 +197,16 @@ export default function ProviderDashboard() {
           {secondStats.map((stat) => (
             <StatCard key={stat.label} {...stat} />
           ))}
+        </div>
+
+        {/* Add Service */}
+        <div className="flex justify-end mt-6">
+          <button
+            onClick={() => navigate("/dashboard/provider/add-service")}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-medium"
+          >
+            + Add Service
+          </button>
         </div>
 
         {/* Upcoming Bookings */}
@@ -233,26 +245,19 @@ export default function ProviderDashboard() {
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      Date :
-                      {" "}
-                      {booking.bookingDate}
+                      Date : {booking.bookingDate}
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      Time :
-                      {" "}
-                      {booking.bookingTime}
+                      Time : {booking.bookingTime}
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      Address :
-                      {" "}
-                      {booking.address}
+                      Address : {booking.address}
                     </p>
 
                     <p className="text-sm text-gray-600">
-                      Amount :
-                      ₹{booking.totalAmount}
+                      Amount : ₹{booking.totalAmount}
                     </p>
 
                     <div className="mt-3">

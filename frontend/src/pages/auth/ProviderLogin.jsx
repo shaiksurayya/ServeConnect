@@ -39,11 +39,12 @@ export default function ProviderLogin() {
       localStorage.setItem("token", data.token)
 
       const user = {
-        id: data.userId,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-      }
+  id: data.userId,
+  providerId: data.providerId,
+  name: data.name,
+  email: data.email,
+  role: data.role,
+}
 
       localStorage.setItem("user", JSON.stringify(user))
 

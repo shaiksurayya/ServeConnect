@@ -17,6 +17,7 @@ import CustomerDashboard from '../pages/dashboard/CustomerDashboard.jsx'
 import CustomerLogin from '../pages/auth/CustomerLogin.jsx'
 import ProviderLogin from '../pages/auth/ProviderLogin.jsx'
 import AdminLogin from '../pages/auth/AdminLogin.jsx'
+import AddService from '../pages/dashboard/AddService.jsx'
 
 export default function AppRoutes() {
   return (
@@ -40,6 +41,7 @@ export default function AppRoutes() {
         <Route path="/dashboard" element={<DashboardSelect />} />
         <Route path="/dashboard/admin" element={<AdminDashboard />} />
         <Route path="/dashboard/provider" element={<ProviderDashboard />} />
+        <Route path="/dashboard/provider/add-service" element={<AddService />} />
         <Route path="/dashboard/customer" element={<CustomerDashboard />} />
 
         <Route path="/about" element={<AboutUs />} />
