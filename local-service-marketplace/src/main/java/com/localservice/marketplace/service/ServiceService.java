@@ -7,17 +7,17 @@ import java.util.List;
 
 public interface ServiceService {
 
-    ServiceResponseDTO createService(ServiceRequestDTO request);
+    ServiceResponseDTO createService(ServiceRequestDTO request, String providerEmail);
 
     List<ServiceResponseDTO> getAllServices();
 
     ServiceResponseDTO getServiceById(Long serviceId);
 
-    ServiceResponseDTO updateService(Long serviceId, ServiceRequestDTO request);
+    ServiceResponseDTO updateService(Long serviceId, ServiceRequestDTO request, String providerEmail);
 
-    void deleteService(Long serviceId);
+    void deleteService(Long serviceId, String providerEmail);
 
     List<ServiceResponseDTO> getServicesByCategory(Long categoryId);
 
-    List<ServiceResponseDTO> getServicesByProvider(Long providerId);
+    List<ServiceResponseDTO> getMyServices(String providerEmail);
 }

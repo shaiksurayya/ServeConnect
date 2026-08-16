@@ -18,7 +18,8 @@ import java.math.BigDecimal;
 @Builder
 public class ServiceRequestDTO {
 
-    @NotNull(message = "Provider ID is required")
+    // Not used: the provider is always derived from the authenticated user (see ServiceServiceImpl).
+    // Kept only for backward compatibility with any existing callers; never trusted server-side.
     private Long providerId;
 
     @NotNull(message = "Category ID is required")

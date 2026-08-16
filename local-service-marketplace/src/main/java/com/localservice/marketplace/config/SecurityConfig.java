@@ -5,6 +5,7 @@ import com.localservice.marketplace.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -19,23 +20,102 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService customUserDetailsService;
 
-   @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
 
-    http
-            .cors(cors -> {})
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session ->
-                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // .authorizeHttpRequests(auth -> auth
-            //         .requestMatchers("/api/auth/**").permitAll()
-            //         .anyRequest().authenticated())
-            .authorizeHttpRequests(auth -> auth
-        .anyRequest().permitAll())
-            .userDetailsService(customUserDetailsService)
-            .addFilterBefore(jwtAuthenticationFilter,
-                    UsernamePasswordAuthenticationFilter.class);
+        http
+                .cors(cors -> {})
+                .csrf(csrf -> csrf.disable())
 
-    return http.build();
-}
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS
+                        )
+                )
+
+                .authorizeHttpRequests(auth -> auth
+
+                        // Public endpoints
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/contact/**"
+                        ).permitAll()
+
+                        // Public GET endpoints
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/services/**",
+                                "/api/categories/**",
+                                "/api/reviews/**",
+                                "/api/providers/**"
+                        ).permitAll()
+
+                        // Customer endpoints
+                        .requestMatchers("/api/customer/**")
+                        .hasAuthority("CUSTOMER")
+
+                        // Provider endpoints
+                        .requestMatchers("/api/provider/**")
+                        .hasAuthority("PROVIDER")
+
+                        /*
+                         * Provider booking operations.
+                         *
+                         * These are explicitly protected for providers.
+                         */
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/bookings/provider/**"
+                        )
+                        .hasAuthority("PROVIDER")
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/bookings/*/reject"
+                        )
+                        .hasAuthority("PROVIDER")
+
+                        // Customer booking creation
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/bookings/customer"
+                        )
+                        .hasAnyAuthority("CUSTOMER", "PROVIDER")
+
+                        // Customer booking deletion
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/bookings/customer/**"
+                        )
+                        .hasAuthority("CUSTOMER")
+
+                        // Provider booking list
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/bookings/provider"
+                        )
+                        .hasAuthority("PROVIDER")
+
+                        // Customer booking list
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/bookings/customer"
+                        )
+                        .hasAnyAuthority("CUSTOMER","PROVIDER")
+
+                        // Everything else requires authentication
+                        .anyRequest()
+                        .authenticated()
+                )
+
+                .userDetailsService(customUserDetailsService)
+
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
+
+        return http.build();
+    }
 }

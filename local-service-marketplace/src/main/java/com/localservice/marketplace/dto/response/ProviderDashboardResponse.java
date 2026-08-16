@@ -3,19 +3,19 @@ package com.localservice.marketplace.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
-import java.util.List;
-
 @Data
 @Builder
-public class CustomerDashboardResponse {
-    private String name;
+public class ProviderDashboardResponse {
+    private Long providerId;
+    private String providerName;
+    private long totalServices;
+    private long activeServices;
     private long totalBookings;
     private long pendingBookings;
     private long acceptedBookings;
     private long completedBookings;
+    private long rejectedBookings;
     private long cancelledBookings;
     private long totalReviews;
-    private BookingSummaryDTO upcomingBooking;
-    private List<BookingSummaryDTO> recentBookings;
-    private List<String> recommendedServices;
+    private double averageRating;
 }

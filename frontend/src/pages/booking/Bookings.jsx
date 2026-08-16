@@ -1,93 +1,7 @@
-// const statusStyles = {
-//   REQUESTED: 'bg-amber/10 text-amber',
-//   ACCEPTED: 'bg-primary/10 text-primary',
-//   IN_PROGRESS: 'bg-primary/10 text-primary',
-//   COMPLETED: 'bg-green-100 text-green-700',
-//   CANCELLED: 'bg-red-100 text-red-600',
-// }
-
-// const bookings = [
-//   {
-//     id: 'BK-1042',
-//     service: 'Electrical wiring check',
-//     provider: 'Ramesh Kumar',
-//     date: '22 Jul 2026',
-//     time: '11:00 AM',
-//     address: 'HSR Layout, Bangalore',
-//     status: 'ACCEPTED',
-//     payment: 'PENDING',
-//     amount: '₹299',
-//   },
-//   {
-//     id: 'BK-1039',
-//     service: 'Bathroom leak fix',
-//     provider: 'Suresh Yadav',
-//     date: '18 Jul 2026',
-//     time: '4:30 PM',
-//     address: 'Koramangala, Bangalore',
-//     status: 'COMPLETED',
-//     payment: 'PAID',
-//     amount: '₹450',
-//   },
-//   {
-//     id: 'BK-1031',
-//     service: 'Bridal makeup trial',
-//     provider: 'Priya Sharma',
-//     date: '10 Jul 2026',
-//     time: '9:00 AM',
-//     address: 'Indiranagar, Bangalore',
-//     status: 'CANCELLED',
-//     payment: 'PENDING',
-//     amount: '₹1,200',
-//   },
-// ]
-
-// export default function Bookings() {
-//   return (
-//     <div className="bg-surface min-h-[calc(100vh-73px)]">
-//       <div className="max-w-5xl mx-auto px-6 py-12">
-//         <h1 className="font-display font-700 text-2xl text-ink">My Bookings</h1>
-//         <p className="text-sm text-sub mt-1 mb-8">Track and manage your service requests.</p>
-
-//         <div className="space-y-4">
-//           {bookings.map((b) => (
-//             <div key={b.id} className="bg-white border border-line rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-//               <div>
-//                 <div className="flex items-center gap-3">
-//                   <span className="text-sm font-semibold text-ink">{b.service}</span>
-//                   <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statusStyles[b.status]}`}>
-//                     {b.status.replace('_', ' ')}
-//                   </span>
-//                 </div>
-//                 <div className="text-xs text-sub mt-1">
-//                   with {b.provider} · {b.date}, {b.time}
-//                 </div>
-//                 <div className="text-xs text-sub mt-0.5">📍 {b.address}</div>
-//               </div>
-
-//               <div className="flex items-center gap-6 sm:text-right">
-//                 <div>
-//                   <div className="text-sm font-semibold text-ink">{b.amount}</div>
-//                   <div className="text-xs text-sub">{b.payment === 'PAID' ? 'Paid' : 'Pay on service'}</div>
-//                 </div>
-//                 <button className="text-xs font-medium text-primary border border-primary rounded-lg px-3 py-1.5 hover:bg-primaryLight transition-colors whitespace-nowrap">
-//                   View details
-//                 </button>
-//               </div>
-//             </div>
-//           ))}
-//         </div>
-
-//         <p className="text-xs text-sub text-center mt-8">
-//           This is sample data — bookings will load from your account once login is connected.
-//         </p>
-//       </div>
-//     </div>
-//   )
-// }
-
-
 import { useEffect, useState } from "react";
+
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const statusStyles = {
   REQUESTED: "bg-yellow-100 text-yellow-700",
@@ -97,29 +11,185 @@ const statusStyles = {
   CANCELLED: "bg-red-100 text-red-700",
 };
 
+function StarPicker({ rating, onChange }) {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          className={`text-2xl leading-none ${
+            star <= rating ? "text-amber-400" : "text-gray-300"
+          }`}
+          aria-label={`${star} star${star > 1 ? "s" : ""}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewModal({ booking, onClose, onSubmitted }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!rating || rating < 1 || rating > 5) {
+      setError("Please select a rating between 1 and 5 stars.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login/customer";
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/reviews`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          bookingId: booking.bookingId,
+          rating,
+          comment,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Unable to submit review. Please try again.";
+
+        try {
+          const body = await response.json();
+
+          if (body?.message) {
+            message = body.message;
+          }
+        } catch (_) {
+          // Non-JSON error body
+        }
+
+        setError(message);
+        return;
+      }
+
+      const savedReview = await response.json();
+      onSubmitted(booking.bookingId, savedReview);
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Something went wrong. Please check your connection and try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-xl border border-line p-6 w-full max-w-md">
+        <h2 className="font-display font-700 text-lg text-ink">
+          Review {booking.providerName}
+        </h2>
+
+        <p className="text-sm text-sub mt-1 mb-4">
+          {booking.serviceTitle}
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-ink block mb-2">
+              Rating
+            </label>
+
+            <StarPicker
+              rating={rating}
+              onChange={setRating}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-ink block mb-2">
+              Comment
+            </label>
+
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Share how the service went..."
+              rows="4"
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 border border-line text-ink rounded-lg py-2 text-sm font-medium hover:bg-surface transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-primary text-white rounded-lg py-2 text-sm font-medium hover:bg-primaryDark transition-colors disabled:opacity-50"
+            >
+              {submitting ? "Submitting..." : "Submit Review"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // useEffect(() => {
-  //   fetchBookings();
-  // }, []);
+  const [error, setError] = useState("");
+  const [reviewingBooking, setReviewingBooking] = useState(null);
+  const [justReviewed, setJustReviewed] = useState(null);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user"));
+    const token = localStorage.getItem("token");
 
-    console.log("USER =", user);
-    console.log("USER ID =", user.userId);
+    if (!token) {
+      window.location.href = "/login/customer";
+      return;
+    }
 
     fetchBookings();
-}, []);
+  }, []);
 
   const fetchBookings = async () => {
-    try {
-      const user = JSON.parse(localStorage.getItem("user"));
+    setLoading(true);
+    setError("");
 
+    try {
       const response = await fetch(
-        `http://localhost:8080/api/bookings/customer/${user.userId}`,
+        `${API_URL}/api/bookings/customer`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -132,16 +202,37 @@ export default function Bookings() {
       }
 
       const data = await response.json();
-
-      console.log("Bookings:", data);
-
       setBookings(data);
     } catch (err) {
       console.error(err);
-      alert("Unable to load bookings");
+      setError(
+        "Unable to load your bookings right now. Please try again."
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReviewSubmitted = (bookingId, savedReview) => {
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.bookingId === bookingId
+          ? {
+              ...b,
+              reviewed: true,
+              reviewRating: savedReview.rating,
+              reviewComment: savedReview.comment,
+            }
+          : b
+      )
+    );
+
+    setReviewingBooking(null);
+    setJustReviewed(bookingId);
+
+    setTimeout(() => {
+      setJustReviewed(null);
+    }, 4000);
   };
 
   if (loading) {
@@ -152,9 +243,32 @@ export default function Bookings() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-surface min-h-[calc(100vh-73px)]">
+        <div className="max-w-5xl mx-auto px-6 py-12">
+          <div className="bg-white rounded-xl border border-line p-10 text-center">
+            <h2 className="text-lg font-semibold text-red-600">
+              {error}
+            </h2>
+
+            <button
+              onClick={fetchBookings}
+              className="mt-4 text-sm font-medium text-primary border border-primary rounded-lg px-4 py-2 hover:bg-primaryLight transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-surface min-h-[calc(100vh-73px)]">
       <div className="max-w-5xl mx-auto px-6 py-12">
+
+        {/* Page Header */}
         <h1 className="font-display font-700 text-2xl text-ink">
           My Bookings
         </h1>
@@ -165,74 +279,220 @@ export default function Bookings() {
 
         {bookings.length === 0 ? (
           <div className="bg-white rounded-xl border border-line p-10 text-center">
-            <h2 className="text-lg font-semibold">No Bookings Found</h2>
+            <h2 className="text-lg font-semibold">
+              No Bookings Found
+            </h2>
+
             <p className="text-sub mt-2">
               You haven't booked any service yet.
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {bookings.map((b) => (
               <div
                 key={b.bookingId}
-                className="bg-white border border-line rounded-xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+                className="bg-white border border-line rounded-xl p-6 shadow-sm"
               >
-                <div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-ink">
-                      {b.serviceTitle}
-                    </span>
 
-                    <span
-                      className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
-                        statusStyles[b.status]
-                      }`}
-                    >
-                      {b.status}
-                    </span>
-                  </div>
-
-                  <div className="text-xs text-sub mt-1">
-                    Provider: <strong>{b.providerName}</strong>
-                  </div>
-
-                  <div className="text-xs text-sub mt-1">
-                    Customer: {b.customerName}
-                  </div>
-
-                  <div className="text-xs text-sub mt-1">
-                    📅 {b.bookingDate}
-                  </div>
-
-                  <div className="text-xs text-sub mt-1">
-                    🕒 {b.bookingTime}
-                  </div>
-
-                  <div className="text-xs text-sub mt-1">
-                    📍 {b.address}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6 sm:text-right">
+                {/* Booking Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-ink">
-                      ₹{b.totalAmount}
-                    </div>
+                    <h2 className="text-base font-semibold text-ink">
+                      {b.serviceTitle}
+                    </h2>
 
-                    <div className="text-xs text-sub">
-                      {b.paymentMethod}
-                    </div>
+                    <p className="text-xs text-sub mt-1">
+                      Booking #{b.bookingId}
+                    </p>
                   </div>
 
-                  <button className="text-xs font-medium text-primary border border-primary rounded-lg px-3 py-1.5 hover:bg-primaryLight transition-colors whitespace-nowrap">
-                    View Details
-                  </button>
+                  <span
+                    className={`text-xs font-medium px-3 py-1 rounded-full w-fit ${
+                      statusStyles[b.status] ||
+                      "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {b.status}
+                  </span>
                 </div>
+
+                {/* Service Details */}
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-ink mb-3">
+                    Service Details
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-sub">
+                        Service
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        {b.serviceTitle}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Status
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        {b.status}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Booking Date
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        📅 {b.bookingDate}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Booking Time
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        🕒 {b.bookingTime}
+                      </p>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <p className="text-xs text-sub">
+                        Service Address
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        📍 {b.address}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Total Amount
+                      </p>
+
+                      <p className="text-sm font-semibold text-ink mt-1">
+                        ₹{b.totalAmount}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Payment Method
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        {b.paymentMethod}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Provider Contact Details */}
+                <div className="mt-6 pt-5 border-t border-line">
+                  <h3 className="text-sm font-semibold text-ink mb-3">
+                    Provider Contact Details
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-sub">
+                        Provider Name
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        {b.providerName}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Email
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1 break-all">
+                        📧 {b.providerEmail}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-sub">
+                        Phone
+                      </p>
+
+                      <p className="text-sm font-medium text-ink mt-1">
+                        📞 {b.providerPhone}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Review */}
+                {b.reviewed && b.reviewRating && (
+                  <div className="mt-6 pt-5 border-t border-line">
+                    <h3 className="text-sm font-semibold text-ink mb-2">
+                      Your Review
+                    </h3>
+
+                    <div className="text-sm text-amber-500">
+                      {"★".repeat(b.reviewRating)}
+                      {"☆".repeat(5 - b.reviewRating)}
+                    </div>
+
+                    {b.reviewComment && (
+                      <p className="text-sm text-sub mt-2">
+                        "{b.reviewComment}"
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {justReviewed === b.bookingId && (
+                  <div className="text-xs text-green-600 mt-3">
+                    Thanks for your review!
+                  </div>
+                )}
+
+                {/* Review Action */}
+                {b.status === "COMPLETED" && (
+                  <div className="mt-5 pt-4 border-t border-line flex justify-end">
+                    {b.reviewed ? (
+                      <span className="text-xs font-medium text-sub border border-line rounded-lg px-3 py-1.5">
+                        Reviewed
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          setReviewingBooking(b)
+                        }
+                        className="text-xs font-medium text-primary border border-primary rounded-lg px-3 py-1.5 hover:bg-primaryLight transition-colors"
+                      >
+                        Review Provider
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {reviewingBooking && (
+        <ReviewModal
+          booking={reviewingBooking}
+          onClose={() => setReviewingBooking(null)}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
     </div>
   );
 }

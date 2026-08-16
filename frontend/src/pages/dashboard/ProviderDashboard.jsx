@@ -11,17 +11,14 @@ export default function ProviderDashboard() {
   const user = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
-  // Temporary for testing
-  // Later replace with:
-  // const providerId = user.providerId;
-  const providerId = 1;
-
   const [services, setServices] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [processingBookingId, setProcessingBookingId] = useState(null);
 
   useEffect(() => {
     fetchDashboard();
@@ -36,14 +33,16 @@ export default function ProviderDashboard() {
         Authorization: `Bearer ${token}`,
       };
 
-      const [serviceRes, bookingRes, reviewRes] = await Promise.all([
-        fetch(`${API_URL}/api/services/provider/${providerId}`, {
+      const [serviceRes, bookingRes, dashboardRes] = await Promise.all([
+        fetch(`${API_URL}/api/services/provider`, {
           headers,
         }),
-        fetch(`${API_URL}/api/bookings/provider/${providerId}`, {
+
+        fetch(`${API_URL}/api/bookings/provider`, {
           headers,
         }),
-        fetch(`${API_URL}/api/reviews/provider/${providerId}`, {
+
+        fetch(`${API_URL}/api/dashboard/provider`, {
           headers,
         }),
       ]);
@@ -56,27 +55,52 @@ export default function ProviderDashboard() {
         ? await bookingRes.json()
         : [];
 
-      const reviewData = reviewRes.ok
-        ? await reviewRes.json()
-        : [];
+      const dashboardData = dashboardRes.ok
+        ? await dashboardRes.json()
+        : null;
+
+      // Reviews are fetched using the authenticated provider ID
+      let reviewData = [];
+
+      if (dashboardData?.providerId) {
+        const reviewRes = await fetch(
+          `${API_URL}/api/reviews/provider/${dashboardData.providerId}`,
+          {
+            headers,
+          }
+        );
+
+        reviewData = reviewRes.ok
+          ? await reviewRes.json()
+          : [];
+      }
 
       setServices(serviceData);
       setBookings(bookingData);
       setReviews(reviewData);
+      setDashboardStats(dashboardData);
 
       setError("");
     } catch (err) {
-      console.error(err);
+      console.error("Dashboard error:", err);
       setError("Unable to load dashboard.");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (bookingId, status) => {
+  /*
+   * ACCEPT BOOKING
+   *
+   * Keep the existing working Accept flow.
+   * Only REQUESTED bookings can be accepted.
+   */
+  const acceptBooking = async (bookingId) => {
     try {
+      setProcessingBookingId(bookingId);
+
       const response = await fetch(
-        `${API_URL}/api/bookings/${bookingId}/status?status=${status}`,
+        `${API_URL}/api/bookings/provider/${bookingId}/status?status=ACCEPTED`,
         {
           method: "PUT",
           headers: {
@@ -86,74 +110,225 @@ export default function ProviderDashboard() {
         }
       );
 
+      const responseText = await response.text();
+
       if (!response.ok) {
-        alert("Unable to update booking.");
+        console.error(
+          "Accept booking failed:",
+          response.status,
+          responseText
+        );
+
+        alert(responseText || "Unable to accept booking.");
         return;
       }
 
-      alert(`Booking ${status.toLowerCase()} successfully.`);
+      // Update ONLY the selected booking
+      setBookings((prevBookings) =>
+        prevBookings.map((booking) =>
+          booking.bookingId === bookingId
+            ? {
+                ...booking,
+                status: "ACCEPTED",
+              }
+            : booking
+        )
+      );
 
-      fetchDashboard();
+      alert("Booking accepted successfully.");
+
+      // Refresh dashboard statistics
+      await fetchDashboard();
     } catch (err) {
-      console.error(err);
+      console.error("Accept booking error:", err);
+      alert("Something went wrong while accepting the booking.");
+    } finally {
+      setProcessingBookingId(null);
+    }
+  };
+
+  /*
+   * REJECT BOOKING
+   *
+   * This is intentionally separate from Accept.
+   *
+   * Only the selected REQUESTED booking is rejected.
+   */
+  const rejectBooking = async (bookingId) => {
+    try {
+      setProcessingBookingId(bookingId);
+
+      const response = await fetch(
+        `${API_URL}/api/bookings/${bookingId}/reject`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        console.error(
+          "Reject booking failed:",
+          response.status,
+          responseText
+        );
+
+        alert(responseText || "Unable to reject booking.");
+        return;
+      }
+
+      // Update ONLY the rejected booking.
+      // Other REQUESTED bookings remain untouched.
+      setBookings((prevBookings) =>
+        prevBookings.map((booking) =>
+          booking.bookingId === bookingId
+            ? {
+                ...booking,
+                status: "REJECTED",
+              }
+            : booking
+        )
+      );
+
+      alert("Booking rejected successfully.");
+
+      // Refresh dashboard statistics
+      await fetchDashboard();
+    } catch (err) {
+      console.error("Reject booking error:", err);
+      alert("Something went wrong while rejecting the booking.");
+    } finally {
+      setProcessingBookingId(null);
+    }
+  };
+
+  /*
+   * COMPLETE BOOKING
+   *
+   * Only ACCEPTED bookings can be completed.
+   */
+  const completeBooking = async (bookingId) => {
+    try {
+      setProcessingBookingId(bookingId);
+
+      const response = await fetch(
+        `${API_URL}/api/bookings/provider/${bookingId}/status?status=COMPLETED`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        console.error(
+          "Complete booking failed:",
+          response.status,
+          responseText
+        );
+
+        alert(responseText || "Unable to complete booking.");
+        return;
+      }
+
+      // Update ONLY the selected booking
+      setBookings((prevBookings) =>
+        prevBookings.map((booking) =>
+          booking.bookingId === bookingId
+            ? {
+                ...booking,
+                status: "COMPLETED",
+              }
+            : booking
+        )
+      );
+
+      alert("Booking marked as completed successfully.");
+
+      // Refresh dashboard statistics
+      await fetchDashboard();
+    } catch (err) {
+      console.error("Complete booking error:", err);
+      alert("Something went wrong while completing the booking.");
+    } finally {
+      setProcessingBookingId(null);
+    }
+  };
+
+  const deleteService = async (serviceId) => {
+    if (!window.confirm("Are you sure you want to delete this service?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/services/${serviceId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        alert("Failed to delete service.");
+        return;
+      }
+
+      alert("Service deleted successfully.");
+
+      setServices((prevServices) =>
+        prevServices.filter(
+          (service) => service.serviceId !== serviceId
+        )
+      );
+    } catch (err) {
+      console.error("Delete service error:", err);
       alert("Something went wrong.");
     }
   };
 
-  const totalServices = services.length;
-  const totalBookings = bookings.length;
-
-  const pending = bookings.filter(
-    (b) => b.status === "REQUESTED"
-  ).length;
-
-  const accepted = bookings.filter(
-    (b) => b.status === "ACCEPTED"
-  ).length;
-
-  const completed = bookings.filter(
-    (b) => b.status === "COMPLETED"
-  ).length;
-
-  const avgRating =
-    reviews.length > 0
-      ? (
-          reviews.reduce((sum, r) => sum + r.rating, 0) /
-          reviews.length
-        ).toFixed(1)
-      : "0.0";
-
   const topStats = [
     {
       label: "My Services",
-      value: totalServices,
+      value: dashboardStats?.totalServices || 0,
     },
     {
       label: "Bookings",
-      value: totalBookings,
+      value: dashboardStats?.totalBookings || 0,
     },
     {
       label: "Rating",
-      value: `${avgRating} ★`,
+      value: `${dashboardStats?.averageRating || 0.0} ★`,
     },
   ];
 
   const secondStats = [
     {
       label: "Pending",
-      value: pending,
+      value: dashboardStats?.pendingBookings || 0,
     },
     {
       label: "Accepted",
-      value: accepted,
+      value: dashboardStats?.acceptedBookings || 0,
     },
     {
       label: "Completed",
-      value: completed,
+      value: dashboardStats?.completedBookings || 0,
     },
     {
       label: "Reviews",
-      value: reviews.length,
+      value: dashboardStats?.totalReviews || 0,
     },
   ];
 
@@ -177,6 +352,7 @@ export default function ProviderDashboard() {
     <div className="bg-surface min-h-[calc(100vh-73px)]">
       <div className="max-w-6xl mx-auto px-6 py-10">
 
+        {/* Header */}
         <h1 className="font-display font-bold text-3xl text-ink">
           Welcome, {user?.name} 👋
         </h1>
@@ -200,13 +376,76 @@ export default function ProviderDashboard() {
         </div>
 
         {/* Add Service */}
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-between items-center mt-8 mb-4">
+          <h2 className="text-xl font-semibold">
+            My Services
+          </h2>
+
           <button
-            onClick={() => navigate("/dashboard/provider/add-service")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg font-medium"
+            onClick={() =>
+              navigate("/dashboard/provider/add-service")
+            }
+            className="bg-primary hover:bg-primaryDark text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-colors"
           >
             + Add Service
           </button>
+        </div>
+
+        {/* Services List */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {services.length === 0 ? (
+            <p className="text-gray-500 col-span-full">
+              No services available.
+            </p>
+          ) : (
+            services.map((service) => (
+              <div
+                key={service.serviceId}
+                className="bg-white border border-line rounded-xl p-5 shadow-sm flex flex-col justify-between"
+              >
+                <div>
+                  <h3 className="font-semibold text-lg text-ink">
+                    {service.title}
+                  </h3>
+
+                  <p className="text-sm text-sub mt-2">
+                    {service.description}
+                  </p>
+
+                  <div className="text-lg font-display font-bold text-ink mt-3">
+                    ₹{service.price}
+                  </div>
+
+                  <div className="text-xs text-sub mt-1">
+                    {service.duration} mins
+                  </div>
+
+                  <div
+                    className={`text-xs font-medium mt-1.5 ${
+                      service.availability
+                        ? "text-green-600"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {service.availability
+                      ? "Available"
+                      : "Unavailable"}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <button
+                    onClick={() =>
+                      deleteService(service.serviceId)
+                    }
+                    className="w-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Delete Service
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Upcoming Bookings */}
@@ -223,99 +462,140 @@ export default function ProviderDashboard() {
           ) : (
             <div className="space-y-4">
 
-              {bookings.map((booking) => (
+              {bookings.map((booking) => {
 
-                <div
-                  key={booking.bookingId}
-                  className="border rounded-xl p-4 flex flex-col md:flex-row md:justify-between md:items-center"
-                >
+                const isProcessing =
+                  processingBookingId === booking.bookingId;
 
-                  <div>
+                return (
+                  <div
+                    key={booking.bookingId}
+                    className="border rounded-xl p-4 flex flex-col md:flex-row md:justify-between md:items-center"
+                  >
 
-                    <h3 className="font-semibold text-lg">
-                      {booking.serviceTitle}
-                    </h3>
+                    {/* Booking Details */}
+                    <div>
 
-                    <p className="text-sm text-gray-600 mt-1">
-                      Customer :
-                      <span className="font-medium">
-                        {" "}
-                        {booking.customerName}
-                      </span>
-                    </p>
+                      <h3 className="font-semibold text-lg">
+                        {booking.serviceTitle}
+                      </h3>
 
-                    <p className="text-sm text-gray-600">
-                      Date : {booking.bookingDate}
-                    </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Customer :
+                        <span className="font-medium">
+                          {" "}
+                          {booking.customerName}
+                        </span>
+                      </p>
 
-                    <p className="text-sm text-gray-600">
-                      Time : {booking.bookingTime}
-                    </p>
+                      <p className="text-sm text-gray-600">
+                        Date : {booking.bookingDate}
+                      </p>
 
-                    <p className="text-sm text-gray-600">
-                      Address : {booking.address}
-                    </p>
+                      <p className="text-sm text-gray-600">
+                        Time : {booking.bookingTime}
+                      </p>
 
-                    <p className="text-sm text-gray-600">
-                      Amount : ₹{booking.totalAmount}
-                    </p>
+                      <p className="text-sm text-gray-600">
+                        Address : {booking.address}
+                      </p>
 
-                    <div className="mt-3">
+                      <p className="text-sm text-gray-600">
+                        Amount : ₹{booking.totalAmount}
+                      </p>
 
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium
-                        ${
-                          booking.status === "REQUESTED"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : booking.status === "ACCEPTED"
-                            ? "bg-blue-100 text-blue-700"
-                            : booking.status === "COMPLETED"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {booking.status}
-                      </span>
+                      <div className="mt-3">
+
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            booking.status === "REQUESTED"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : booking.status === "ACCEPTED"
+                              ? "bg-blue-100 text-blue-700"
+                              : booking.status === "COMPLETED"
+                              ? "bg-green-100 text-green-700"
+                              : booking.status === "REJECTED"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {booking.status}
+                        </span>
+
+                      </div>
 
                     </div>
+
+                    {/* Booking Actions */}
+                    {booking.status === "REQUESTED" && (
+                      <div className="flex gap-3 mt-4 md:mt-0">
+
+                        {/* Accept */}
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() =>
+                            acceptBooking(booking.bookingId)
+                          }
+                          className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg ${
+                            isProcessing
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          {isProcessing
+                            ? "Processing..."
+                            : "Accept"}
+                        </button>
+
+                        {/* Reject */}
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() =>
+                            rejectBooking(booking.bookingId)
+                          }
+                          className={`bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg ${
+                            isProcessing
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          {isProcessing
+                            ? "Processing..."
+                            : "Reject"}
+                        </button>
+
+                      </div>
+                    )}
+
+                    {/* Complete */}
+                    {booking.status === "ACCEPTED" && (
+                      <div className="mt-4 md:mt-0">
+
+                        <button
+                          type="button"
+                          disabled={isProcessing}
+                          onClick={() =>
+                            completeBooking(booking.bookingId)
+                          }
+                          className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg ${
+                            isProcessing
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          {isProcessing
+                            ? "Processing..."
+                            : "Mark as Completed"}
+                        </button>
+
+                      </div>
+                    )}
 
                   </div>
-
-                  {booking.status === "REQUESTED" && (
-
-                    <div className="flex gap-3 mt-4 md:mt-0">
-
-                      <button
-                        onClick={() =>
-                          updateStatus(
-                            booking.bookingId,
-                            "ACCEPTED"
-                          )
-                        }
-                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
-                      >
-                        Accept
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          updateStatus(
-                            booking.bookingId,
-                            "REJECTED"
-                          )
-                        }
-                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
-                      >
-                        Reject
-                      </button>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              ))}
+                );
+              })}
 
             </div>
           )}
@@ -323,7 +603,6 @@ export default function ProviderDashboard() {
         </div>
 
         {/* Reviews */}
-
         <div className="bg-white border border-line rounded-xl p-6 mt-8 shadow-sm">
 
           <h2 className="text-xl font-semibold mb-5">
@@ -335,7 +614,6 @@ export default function ProviderDashboard() {
               No reviews available.
             </p>
           ) : (
-
             <div className="space-y-4">
 
               {reviews.map((review) => (
@@ -367,7 +645,6 @@ export default function ProviderDashboard() {
               ))}
 
             </div>
-
           )}
 
         </div>

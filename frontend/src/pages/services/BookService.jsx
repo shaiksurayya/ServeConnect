@@ -6,6 +6,9 @@ export default function BookService() {
   const navigate = useNavigate();
 
   const [service, setService] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const [form, setForm] = useState({
     date: "",
@@ -17,13 +20,26 @@ export default function BookService() {
 
   useEffect(() => {
     fetch(`http://localhost:8080/api/services/${id}`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Service not found");
+        return res.json();
+      })
       .then((data) => {
-        console.log("Loaded Service:", data);
         setService(data);
       })
-      .catch((err) => console.log(err));
+      .catch((err) => {
+        console.error(err);
+        setLoadError("Unable to load this service. It may no longer be available.");
+      });
   }, [id]);
+
+  if (loadError) {
+    return (
+      <div className="text-center mt-10 text-red-600">
+        <h2>{loadError}</h2>
+      </div>
+    );
+  }
 
   if (!service) {
     return (
@@ -43,41 +59,58 @@ export default function BookService() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const user = JSON.parse(localStorage.getItem("user"));
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login/customer");
+      return;
+    }
 
     const bookingData = {
-      customerId: user.userId,
-      providerId: service.providerId,
       serviceId: service.serviceId,
       bookingDate: form.date,
       bookingTime: form.time,
       address: form.address,
     };
 
-    console.log("Sending Booking:", bookingData);
+    setSubmitting(true);
+    setSubmitError("");
 
     try {
-      const response = await fetch("http://localhost:8080/api/bookings", {
+      const response = await fetch("http://localhost:8080/api/bookings/customer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify(bookingData),
       });
 
-      if (!response.ok) {
-        alert("Booking Failed");
+      if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        navigate("/login/customer");
         return;
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        let message = "Booking failed. Please try again.";
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.message) message = errorBody.message;
+        } catch (_) {
+          // response wasn't JSON, keep the default message
+        }
+        setSubmitError(message);
+        return;
+      }
 
-      console.log("Booking Success:", result);
-
+      await response.json();
       setConfirmed(true);
     } catch (err) {
-      console.log(err);
-      alert("Booking Failed");
+      console.error(err);
+      setSubmitError("Booking failed. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -146,11 +179,16 @@ export default function BookService() {
           required
         />
 
+        {submitError && (
+          <p className="text-sm text-red-600">{submitError}</p>
+        )}
+
         <button
           type="submit"
-          className="w-full bg-primary text-white p-2 rounded"
+          disabled={submitting}
+          className="w-full bg-primary text-white p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Confirm Booking
+          {submitting ? "Booking..." : "Confirm Booking"}
         </button>
 
       </form>

@@ -37,6 +37,7 @@ export default function ProviderLogin() {
       }
 
       localStorage.setItem("token", data.token)
+      localStorage.setItem("loginMode", "PROVIDER")
 
       const user = {
   id: data.userId,

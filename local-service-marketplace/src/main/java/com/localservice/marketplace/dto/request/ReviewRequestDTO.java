@@ -19,10 +19,8 @@ public class ReviewRequestDTO {
     @NotNull
     private Long bookingId;
 
-    @NotNull
     private Long customerId;
 
-    @NotNull
     private Long providerId;
 
     @NotNull

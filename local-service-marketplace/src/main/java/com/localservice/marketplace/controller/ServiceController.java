@@ -20,9 +20,9 @@ public class ServiceController {
 
     private final ServiceService serviceService;
 
-    @PostMapping
-    public ResponseEntity<ServiceResponseDTO> createService(@Valid @RequestBody ServiceRequestDTO request) {
-        ServiceResponseDTO response = serviceService.createService(request);
+    @PostMapping("/provider")
+    public ResponseEntity<ServiceResponseDTO> createService(@Valid @RequestBody ServiceRequestDTO request, org.springframework.security.core.Authentication authentication) {
+        ServiceResponseDTO response = serviceService.createService(request, authentication.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -38,16 +38,16 @@ public class ServiceController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{serviceId}")
+    @PutMapping("/provider/{serviceId}")
     public ResponseEntity<ServiceResponseDTO> updateService(@PathVariable Long serviceId,
-                                                              @Valid @RequestBody ServiceRequestDTO request) {
-        ServiceResponseDTO response = serviceService.updateService(serviceId, request);
+                                                              @Valid @RequestBody ServiceRequestDTO request, org.springframework.security.core.Authentication authentication) {
+        ServiceResponseDTO response = serviceService.updateService(serviceId, request, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{serviceId}")
-    public ResponseEntity<String> deleteService(@PathVariable Long serviceId) {
-        serviceService.deleteService(serviceId);
+    @DeleteMapping("/provider/{serviceId}")
+    public ResponseEntity<String> deleteService(@PathVariable Long serviceId, org.springframework.security.core.Authentication authentication) {
+        serviceService.deleteService(serviceId, authentication.getName());
         return ResponseEntity.ok("Service deleted successfully.");
     }
 
@@ -57,9 +57,9 @@ public class ServiceController {
         return ResponseEntity.ok(responses);
     }
 
-    @GetMapping("/provider/{providerId}")
-    public ResponseEntity<List<ServiceResponseDTO>> getServicesByProvider(@PathVariable Long providerId) {
-        List<ServiceResponseDTO> responses = serviceService.getServicesByProvider(providerId);
+    @GetMapping("/provider")
+    public ResponseEntity<List<ServiceResponseDTO>> getMyServices(org.springframework.security.core.Authentication authentication) {
+        List<ServiceResponseDTO> responses = serviceService.getMyServices(authentication.getName());
         return ResponseEntity.ok(responses);
     }
 }

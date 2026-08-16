@@ -18,10 +18,8 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class BookingRequestDTO {
 
-    @NotNull
     private Long customerId;
 
-    @NotNull
     private Long providerId;
 
     @NotNull

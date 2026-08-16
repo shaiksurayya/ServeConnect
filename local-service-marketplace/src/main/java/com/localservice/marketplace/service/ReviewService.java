@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface ReviewService {
 
-    ReviewResponseDTO createReview(ReviewRequestDTO reviewRequestDTO);
+    ReviewResponseDTO createReview(ReviewRequestDTO reviewRequestDTO, String customerEmail);
 
     List<ReviewResponseDTO> getAllReviews();
 
@@ -18,4 +18,5 @@ public interface ReviewService {
     List<ReviewResponseDTO> getReviewsByCustomer(Long customerId);
 
     void deleteReview(Long reviewId);
+    List<ReviewResponseDTO> getReviewsByService(Long serviceId);
 }

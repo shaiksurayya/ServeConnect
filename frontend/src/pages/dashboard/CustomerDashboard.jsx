@@ -7,6 +7,7 @@ export default function CustomerDashboard() {
 
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   let user = null
 
@@ -24,37 +25,47 @@ try {
 const userId = user?.userId
 const token = localStorage.getItem("token")
   useEffect(() => {
-    if (userId) {
-      fetchDashboard()
-    } else {
-      setLoading(false)
+    if (!token) {
+      navigate('/login/customer')
+      return
     }
-  }, [])
+    fetchDashboard()
+  }, [navigate, token])
+
   console.log("User:", user)
-console.log("User ID:", userId)
-console.log("Token:", token)
+  console.log("User ID:", userId)
+  console.log("Token:", token)
 
   const fetchDashboard = async () => {
+    setLoading(true)
+    setError('')
     try {
       const response = await fetch(
-        `http://localhost:8080/api/dashboard/customer/${userId}`,
+        `http://localhost:8080/api/dashboard/customer`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       )
-if (!response.ok) {
-  const error = await response.text()
-  console.log("Backend Error:", error)
-  throw new Error(error)
-}
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          navigate('/login/customer')
+          return
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("Backend Error:", errorText)
+          throw new Error('Failed to load dashboard')
+        }
 
       const data = await response.json()
-      console.log('Dashboard Response:', data)
       setDashboard(data)
-    } catch (error) {
-      console.error(error)
+    } catch (err) {
+      console.error(err)
+      setError('Unable to load your dashboard right now. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -68,10 +79,16 @@ if (!response.ok) {
     )
   }
 
-  if (!dashboard) {
+  if (error || !dashboard) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        Failed to load dashboard.
+      <div className="flex flex-col justify-center items-center h-screen gap-4">
+        <p className="text-red-600">{error || 'Failed to load dashboard.'}</p>
+        <button
+          onClick={fetchDashboard}
+          className="text-sm font-medium text-primary border border-primary rounded-lg px-4 py-2 hover:bg-primaryLight transition-colors"
+        >
+          Try again
+        </button>
       </div>
     )
   }

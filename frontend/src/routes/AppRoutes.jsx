@@ -18,6 +18,9 @@ import CustomerLogin from '../pages/auth/CustomerLogin.jsx'
 import ProviderLogin from '../pages/auth/ProviderLogin.jsx'
 import AdminLogin from '../pages/auth/AdminLogin.jsx'
 import AddService from '../pages/dashboard/AddService.jsx'
+import UpcomingBookings from '../pages/dashboard/UpcomingBookings.jsx'
+import ProviderReviews from '../pages/dashboard/ProviderReviews.jsx'
+import ServiceDetails from "../pages/services/ServiceDetails";
 
 export default function AppRoutes() {
   return (
@@ -34,6 +37,7 @@ export default function AppRoutes() {
 
         <Route path="/services" element={<Services />} />
         <Route path="/book/:id" element={<BookService />} />
+        <Route path="/services/:serviceId" element={<ServiceDetails />}/>
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/reviews" element={<Reviews />} />
         <Route path="/profile" element={<Profile />} />
@@ -41,6 +45,8 @@ export default function AppRoutes() {
         <Route path="/dashboard" element={<DashboardSelect />} />
         <Route path="/dashboard/admin" element={<AdminDashboard />} />
         <Route path="/dashboard/provider" element={<ProviderDashboard />} />
+        <Route path="/dashboard/provider/bookings" element={<UpcomingBookings />} />
+        <Route path="/dashboard/provider/reviews" element={<ProviderReviews />} />
         <Route path="/dashboard/provider/add-service" element={<AddService />} />
         <Route path="/dashboard/customer" element={<CustomerDashboard />} />
 
@@ -50,3 +56,4 @@ export default function AppRoutes() {
     </Routes>
   )
 }
+

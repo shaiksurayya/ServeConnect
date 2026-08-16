@@ -27,8 +27,8 @@ public class ReviewController {
     }
 
     @PostMapping
-    public ResponseEntity<ReviewResponseDTO> createReview(@Valid @RequestBody ReviewRequestDTO reviewRequestDTO) {
-        ReviewResponseDTO response = reviewService.createReview(reviewRequestDTO);
+    public ResponseEntity<ReviewResponseDTO> createReview(@Valid @RequestBody ReviewRequestDTO reviewRequestDTO, org.springframework.security.core.Authentication auth) {
+        ReviewResponseDTO response = reviewService.createReview(reviewRequestDTO, auth.getName());
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -57,4 +57,13 @@ public class ReviewController {
         reviewService.deleteReview(reviewId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/service/{serviceId}")
+public ResponseEntity<List<ReviewResponseDTO>> getReviewsByService(
+        @PathVariable Long serviceId) {
+
+    return ResponseEntity.ok(
+            reviewService.getReviewsByService(serviceId)
+    );
+}
 }

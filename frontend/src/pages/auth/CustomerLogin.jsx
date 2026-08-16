@@ -31,6 +31,7 @@ export default function CustomerLogin() {
 console.log("Login Response:", data)
 
 localStorage.setItem("token", data.token)
+localStorage.setItem("loginMode", "CUSTOMER")
 
 const user = {
   userId: data.userId,

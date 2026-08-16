@@ -31,10 +31,10 @@ public class ServiceServiceImpl implements ServiceService {
     }
 
     @Override
-    public ServiceResponseDTO createService(ServiceRequestDTO request) {
-        ProviderProfile provider = providerProfileRepository.findById(request.getProviderId())
+    public ServiceResponseDTO createService(ServiceRequestDTO request, String providerEmail) {
+        ProviderProfile provider = providerProfileRepository.findByUser_Email(providerEmail)
                 .orElseThrow(() -> new RuntimeException(
-                        "Provider not found with id: " + request.getProviderId()));
+                        "Provider not found for email: " + providerEmail));
 
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException(
@@ -59,6 +59,7 @@ public class ServiceServiceImpl implements ServiceService {
     public List<ServiceResponseDTO> getAllServices() {
         return serviceRepository.findAll()
                 .stream()
+                .filter(com.localservice.marketplace.entity.Service::getAvailability)
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());
     }
@@ -73,20 +74,22 @@ public class ServiceServiceImpl implements ServiceService {
     }
 
     @Override
-    public ServiceResponseDTO updateService(Long serviceId, ServiceRequestDTO request) {
+    public ServiceResponseDTO updateService(Long serviceId, ServiceRequestDTO request, String providerEmail) {
         com.localservice.marketplace.entity.Service existingService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new RuntimeException(
                         "Service not found with id: " + serviceId));
 
-        ProviderProfile provider = providerProfileRepository.findById(request.getProviderId())
-                .orElseThrow(() -> new RuntimeException(
-                        "Provider not found with id: " + request.getProviderId()));
+        ProviderProfile providerProfile = providerProfileRepository.findByUser_Email(providerEmail)
+                .orElseThrow(() -> new RuntimeException("Provider profile not found for email: " + providerEmail));
+
+        if (!existingService.getProvider().getProviderId().equals(providerProfile.getProviderId())) {
+            throw new RuntimeException("You are not authorized to update this service");
+        }
 
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new RuntimeException(
                         "Category not found with id: " + request.getCategoryId()));
 
-        existingService.setProvider(provider);
         existingService.setCategory(category);
         existingService.setTitle(request.getTitle());
         existingService.setDescription(request.getDescription());
@@ -100,10 +103,17 @@ public class ServiceServiceImpl implements ServiceService {
     }
 
     @Override
-    public void deleteService(Long serviceId) {
+    public void deleteService(Long serviceId, String providerEmail) {
         com.localservice.marketplace.entity.Service existingService = serviceRepository.findById(serviceId)
                 .orElseThrow(() -> new RuntimeException(
                         "Service not found with id: " + serviceId));
+
+        ProviderProfile providerProfile = providerProfileRepository.findByUser_Email(providerEmail)
+                .orElseThrow(() -> new RuntimeException("Provider profile not found for email: " + providerEmail));
+
+        if (!existingService.getProvider().getProviderId().equals(providerProfile.getProviderId())) {
+            throw new RuntimeException("You are not authorized to delete this service");
+        }
 
         serviceRepository.delete(existingService);
     }
@@ -117,8 +127,10 @@ public class ServiceServiceImpl implements ServiceService {
     }
 
     @Override
-    public List<ServiceResponseDTO> getServicesByProvider(Long providerId) {
-        return serviceRepository.findByProvider_ProviderId(providerId)
+    public List<ServiceResponseDTO> getMyServices(String providerEmail) {
+        ProviderProfile providerProfile = providerProfileRepository.findByUser_Email(providerEmail)
+                .orElseThrow(() -> new RuntimeException("Provider profile not found for email: " + providerEmail));
+        return serviceRepository.findByProvider_ProviderId(providerProfile.getProviderId())
                 .stream()
                 .map(this::mapToResponseDTO)
                 .collect(Collectors.toList());

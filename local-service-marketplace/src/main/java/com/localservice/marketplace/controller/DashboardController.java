@@ -13,10 +13,13 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
 
-    @GetMapping("/customer/{customerId}")
-    public CustomerDashboardResponse getCustomerDashboard(
-            @PathVariable Long customerId) {
+    @GetMapping("/customer")
+    public CustomerDashboardResponse getCustomerDashboard(org.springframework.security.core.Authentication authentication) {
+        return dashboardService.getCustomerDashboard(authentication.getName());
+    }
 
-        return dashboardService.getCustomerDashboard(customerId);
+    @GetMapping("/provider")
+    public com.localservice.marketplace.dto.response.ProviderDashboardResponse getProviderDashboard(org.springframework.security.core.Authentication authentication) {
+        return dashboardService.getProviderDashboard(authentication.getName());
     }
 }

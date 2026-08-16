@@ -37,16 +37,25 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    public ReviewResponseDTO createReview(ReviewRequestDTO reviewRequestDTO) {
+    public ReviewResponseDTO createReview(ReviewRequestDTO reviewRequestDTO, String customerEmail) {
 
         Booking booking = bookingRepository.findById(reviewRequestDTO.getBookingId())
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + reviewRequestDTO.getBookingId()));
 
-        User customer = userRepository.findById(reviewRequestDTO.getCustomerId())
-                .orElseThrow(() -> new RuntimeException("Customer not found with id: " + reviewRequestDTO.getCustomerId()));
+        if (!booking.getCustomer().getEmail().equals(customerEmail)) {
+            throw new RuntimeException("You are not authorized to review this booking");
+        }
+        
+        if (booking.getStatus() != com.localservice.marketplace.enums.BookingStatus.COMPLETED) {
+            throw new RuntimeException("You can only review completed bookings");
+        }
 
-        ProviderProfile provider = providerProfileRepository.findById(reviewRequestDTO.getProviderId())
-                .orElseThrow(() -> new RuntimeException("Provider not found with id: " + reviewRequestDTO.getProviderId()));
+        if (reviewRepository.existsByBooking_BookingId(booking.getBookingId())) {
+            throw new RuntimeException("This booking has already been reviewed");
+        }
+
+        User customer = booking.getCustomer();
+        ProviderProfile provider = booking.getProvider();
 
         Review review = Review.builder()
                 .booking(booking)
@@ -57,6 +66,12 @@ public class ReviewServiceImpl implements ReviewService {
                 .build();
 
         Review savedReview = reviewRepository.save(review);
+
+        // Update Provider average rating
+        List<Review> providerReviews = reviewRepository.findByProvider_ProviderId(provider.getProviderId());
+        double avg = providerReviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
+        provider.setAvgRating(java.math.BigDecimal.valueOf(avg));
+        providerProfileRepository.save(provider);
 
         return mapToResponseDTO(savedReview);
     }
@@ -93,6 +108,16 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+public List<ReviewResponseDTO> getReviewsByService(Long serviceId) {
+
+    return reviewRepository
+            .findByBooking_Service_ServiceId(serviceId)
+            .stream()
+            .map(this::mapToResponseDTO)
+            .collect(Collectors.toList());
+}
+
+    @Override
     public void deleteReview(Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + reviewId));
@@ -112,4 +137,6 @@ public class ReviewServiceImpl implements ReviewService {
                 .createdAt(review.getCreatedAt())
                 .build();
     }
+
+    
 }

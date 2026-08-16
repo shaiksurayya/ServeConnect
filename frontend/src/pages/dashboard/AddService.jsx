@@ -8,14 +8,9 @@ export default function AddService() {
 
   const user = JSON.parse(localStorage.getItem("user"));
 
-  
-  // Later replace with user.providerId
-  const providerId = 1;
-
   const [categories, setCategories] = useState([]);
 
   const [formData, setFormData] = useState({
-    providerId: providerId,
     categoryId: "",
     title: "",
     description: "",
@@ -69,7 +64,6 @@ export default function AddService() {
       setLoading(true);
 
       const requestData = {
-        providerId: Number(formData.providerId),
         categoryId: Number(formData.categoryId),
         title: formData.title,
         description: formData.description,
@@ -78,7 +72,7 @@ export default function AddService() {
         availability: formData.availability,
       };
 
-      const response = await fetch(`${API_URL}/api/services`, {
+      const response = await fetch(`${API_URL}/api/services/provider`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -97,7 +91,6 @@ export default function AddService() {
       alert("Service added successfully!");
 
       setFormData({
-        providerId: providerId,
         categoryId: "",
         title: "",
         description: "",
