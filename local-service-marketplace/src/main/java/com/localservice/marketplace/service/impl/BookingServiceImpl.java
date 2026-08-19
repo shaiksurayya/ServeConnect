@@ -1,6 +1,7 @@
 package com.localservice.marketplace.service.impl;
 
 import com.localservice.marketplace.dto.request.BookingRequestDTO;
+import com.localservice.marketplace.dto.request.RescheduleRequestDTO;
 import com.localservice.marketplace.dto.response.BookingResponseDTO;
 import com.localservice.marketplace.entity.Booking;
 import com.localservice.marketplace.entity.ProviderProfile;
@@ -14,6 +15,7 @@ import com.localservice.marketplace.service.BookingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,6 +45,14 @@ public class BookingServiceImpl implements BookingService {
             BookingRequestDTO request,
             String customerEmail) {
 
+        if (request.getBookingDate() == null || request.getBookingDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Booking date cannot be in the past.");
+        }
+
+        if (request.getBookingTime() == null) {
+            throw new IllegalArgumentException("Booking time is required.");
+        }
+
         User customer = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() ->
                         new RuntimeException(
@@ -55,6 +65,10 @@ public class BookingServiceImpl implements BookingService {
                                 new RuntimeException(
                                         "Service not found with id: "
                                                 + request.getServiceId()));
+
+        if (Boolean.FALSE.equals(service.getAvailability())) {
+            throw new IllegalStateException("Service is currently unavailable for booking.");
+        }
 
         ProviderProfile provider = service.getProvider();
 
@@ -74,6 +88,81 @@ public class BookingServiceImpl implements BookingService {
 
         return mapToResponseDTO(savedBooking);
     }
+
+    @Override
+    public BookingResponseDTO rescheduleBooking(
+            Long bookingId,
+            RescheduleRequestDTO request,
+            String customerEmail) {
+
+        if (request.getBookingDate() == null || request.getBookingDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Rescheduled booking date cannot be in the past.");
+        }
+
+        if (request.getBookingTime() == null) {
+            throw new IllegalArgumentException("Booking time is required.");
+        }
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Booking not found with id: " + bookingId));
+
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Customer not found for email: " + customerEmail));
+
+        if (!booking.getCustomer().getUserId().equals(customer.getUserId())) {
+            throw new RuntimeException("You are not authorized to reschedule this booking");
+        }
+
+        BookingStatus currentStatus = booking.getStatus();
+        if (currentStatus != BookingStatus.REQUESTED && currentStatus != BookingStatus.ACCEPTED) {
+            throw new IllegalStateException(
+                    "Only REQUESTED or ACCEPTED bookings can be rescheduled. Current status: " + currentStatus);
+        }
+
+        booking.setBookingDate(request.getBookingDate());
+        booking.setBookingTime(request.getBookingTime());
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return mapToResponseDTO(savedBooking);
+    }
+
+    @Override
+    public BookingResponseDTO cancelBookingCustomer(
+            Long bookingId,
+            String customerEmail) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Booking not found with id: " + bookingId));
+
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Customer not found for email: " + customerEmail));
+
+        if (!booking.getCustomer().getUserId().equals(customer.getUserId())) {
+            throw new RuntimeException("You are not authorized to cancel this booking");
+        }
+
+        BookingStatus currentStatus = booking.getStatus();
+        if (currentStatus != BookingStatus.REQUESTED && currentStatus != BookingStatus.ACCEPTED) {
+            throw new IllegalStateException(
+                    "Only REQUESTED or ACCEPTED bookings can be cancelled. Current status: " + currentStatus);
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return mapToResponseDTO(savedBooking);
+    }
+
 
     @Override
     public List<BookingResponseDTO> getAllBookings() {

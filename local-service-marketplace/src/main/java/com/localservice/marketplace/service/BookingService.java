@@ -1,6 +1,7 @@
 package com.localservice.marketplace.service;
 
 import com.localservice.marketplace.dto.request.BookingRequestDTO;
+import com.localservice.marketplace.dto.request.RescheduleRequestDTO;
 import com.localservice.marketplace.dto.response.BookingResponseDTO;
 import com.localservice.marketplace.enums.BookingStatus;
 
@@ -10,6 +11,17 @@ public interface BookingService {
 
     BookingResponseDTO createBooking(
             BookingRequestDTO request,
+            String customerEmail
+    );
+
+    BookingResponseDTO rescheduleBooking(
+            Long bookingId,
+            RescheduleRequestDTO request,
+            String customerEmail
+    );
+
+    BookingResponseDTO cancelBookingCustomer(
+            Long bookingId,
             String customerEmail
     );
 
@@ -44,4 +56,4 @@ public interface BookingService {
             Long bookingId,
             String customerEmail
     );
-}
+}

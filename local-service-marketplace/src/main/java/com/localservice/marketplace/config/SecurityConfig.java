@@ -42,6 +42,8 @@ public class SecurityConfig {
                                 "/api/contact/**"
                         ).permitAll()
 
+                        .requestMatchers("/api/notifications/**").authenticated()
+
                         // Public GET endpoints
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -83,12 +85,24 @@ public class SecurityConfig {
                         )
                         .hasAnyAuthority("CUSTOMER", "PROVIDER")
 
-                        // Customer booking deletion
+                        // Customer booking reschedule/cancel/deletion
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/bookings/customer/**"
+                        )
+                        .hasAuthority("CUSTOMER")
+
                         .requestMatchers(
                                 HttpMethod.DELETE,
                                 "/api/bookings/customer/**"
                         )
                         .hasAuthority("CUSTOMER")
+
+                        // Provider service operations
+                        .requestMatchers(
+                                "/api/services/provider/**"
+                        )
+                        .hasAuthority("PROVIDER")
 
                         // Provider booking list
                         .requestMatchers(
@@ -103,6 +117,7 @@ public class SecurityConfig {
                                 "/api/bookings/customer"
                         )
                         .hasAnyAuthority("CUSTOMER","PROVIDER")
+
 
                         // Everything else requires authentication
                         .anyRequest()

@@ -45,6 +45,16 @@ public class ServiceController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/provider/{serviceId}/availability")
+    public ResponseEntity<ServiceResponseDTO> updateServiceAvailability(
+            @PathVariable Long serviceId,
+            @RequestParam Boolean availability,
+            org.springframework.security.core.Authentication authentication) {
+        ServiceResponseDTO response = serviceService.updateServiceAvailability(serviceId, availability, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+
     @DeleteMapping("/provider/{serviceId}")
     public ResponseEntity<String> deleteService(@PathVariable Long serviceId, org.springframework.security.core.Authentication authentication) {
         serviceService.deleteService(serviceId, authentication.getName());

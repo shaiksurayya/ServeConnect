@@ -16,6 +16,7 @@ import com.localservice.marketplace.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -110,6 +111,12 @@ public class DashboardServiceImpl implements DashboardService {
         long cancelled = bookings.stream().filter(b -> b.getStatus() == BookingStatus.CANCELLED).count();
         long totalReviews = reviewRepository.findByProvider_ProviderId(providerProfile.getProviderId()).size();
 
+        BigDecimal totalCompletedEarnings = bookings.stream()
+                .filter(b -> b.getStatus() == BookingStatus.COMPLETED)
+                .map(Booking::getTotalAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return ProviderDashboardResponse.builder()
                 .providerId(providerProfile.getProviderId())
                 .providerName(providerProfile.getUser().getName())
@@ -123,6 +130,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .cancelledBookings(cancelled)
                 .totalReviews(totalReviews)
                 .averageRating(providerProfile.getAvgRating() != null ? providerProfile.getAvgRating().doubleValue() : 0.0)
+                .totalCompletedEarnings(totalCompletedEarnings)
                 .build();
     }
 }
+

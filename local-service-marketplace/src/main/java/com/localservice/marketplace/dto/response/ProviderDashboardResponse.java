@@ -3,6 +3,8 @@ package com.localservice.marketplace.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 public class ProviderDashboardResponse {
@@ -18,4 +20,6 @@ public class ProviderDashboardResponse {
     private long cancelledBookings;
     private long totalReviews;
     private double averageRating;
+    private BigDecimal totalCompletedEarnings;
 }
+

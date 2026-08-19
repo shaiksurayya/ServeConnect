@@ -136,6 +136,24 @@ public class ServiceServiceImpl implements ServiceService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public ServiceResponseDTO updateServiceAvailability(Long serviceId, Boolean availability, String providerEmail) {
+        com.localservice.marketplace.entity.Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new RuntimeException("Service not found with id: " + serviceId));
+
+        ProviderProfile providerProfile = providerProfileRepository.findByUser_Email(providerEmail)
+                .orElseThrow(() -> new RuntimeException("Provider profile not found for email: " + providerEmail));
+
+        if (!service.getProvider().getProviderId().equals(providerProfile.getProviderId())) {
+            throw new RuntimeException("You are not authorized to update this service availability");
+        }
+
+        service.setAvailability(availability != null ? availability : true);
+        com.localservice.marketplace.entity.Service updatedService = serviceRepository.save(service);
+        return mapToResponseDTO(updatedService);
+    }
+
+
     private ServiceResponseDTO mapToResponseDTO(com.localservice.marketplace.entity.Service service) {
         return ServiceResponseDTO.builder()
                 .serviceId(service.getServiceId())

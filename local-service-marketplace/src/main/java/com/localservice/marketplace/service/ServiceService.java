@@ -20,4 +20,6 @@ public interface ServiceService {
     List<ServiceResponseDTO> getServicesByCategory(Long categoryId);
 
     List<ServiceResponseDTO> getMyServices(String providerEmail);
-}
+
+    ServiceResponseDTO updateServiceAvailability(Long serviceId, Boolean availability, String providerEmail);
+}

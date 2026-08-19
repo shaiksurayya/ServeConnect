@@ -1,6 +1,7 @@
 package com.localservice.marketplace.controller;
 
 import com.localservice.marketplace.dto.request.BookingRequestDTO;
+import com.localservice.marketplace.dto.request.RescheduleRequestDTO;
 import com.localservice.marketplace.dto.response.BookingResponseDTO;
 import com.localservice.marketplace.enums.BookingStatus;
 import com.localservice.marketplace.service.BookingService;
@@ -29,6 +30,37 @@ public class BookingController {
 
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
+
+    @PutMapping("/customer/{bookingId}/reschedule")
+    public ResponseEntity<BookingResponseDTO> rescheduleBooking(
+            @PathVariable Long bookingId,
+            @Valid @RequestBody RescheduleRequestDTO request,
+            org.springframework.security.core.Authentication authentication) {
+
+        BookingResponseDTO response =
+                bookingService.rescheduleBooking(
+                        bookingId,
+                        request,
+                        authentication.getName()
+                );
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PutMapping("/customer/{bookingId}/cancel")
+    public ResponseEntity<BookingResponseDTO> cancelBooking(
+            @PathVariable Long bookingId,
+            org.springframework.security.core.Authentication authentication) {
+
+        BookingResponseDTO response =
+                bookingService.cancelBookingCustomer(
+                        bookingId,
+                        authentication.getName()
+                );
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
 
     @GetMapping
     public ResponseEntity<List<BookingResponseDTO>> getAllBookings() {
