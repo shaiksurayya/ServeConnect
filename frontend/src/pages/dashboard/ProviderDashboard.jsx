@@ -264,6 +264,33 @@ export default function ProviderDashboard() {
     }
   };
 
+  const toggleServiceAvailability = async (serviceId, currentAvailability) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/services/provider/${serviceId}/availability?availability=${!currentAvailability}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        alert("Failed to update service availability.");
+        return;
+      }
+
+      const updatedService = await response.json();
+      setServices((prev) =>
+        prev.map((s) => (s.serviceId === serviceId ? updatedService : s))
+      );
+    } catch (err) {
+      console.error("Toggle availability error:", err);
+      alert("Something went wrong.");
+    }
+  };
+
   const deleteService = async (serviceId) => {
     if (!window.confirm("Are you sure you want to delete this service?")) {
       return;
@@ -300,12 +327,12 @@ export default function ProviderDashboard() {
 
   const topStats = [
     {
-      label: "My Services",
-      value: dashboardStats?.totalServices || 0,
+      label: "Total Bookings",
+      value: dashboardStats?.totalBookings || 0,
     },
     {
-      label: "Bookings",
-      value: dashboardStats?.totalBookings || 0,
+      label: "Completed Earnings",
+      value: `₹${dashboardStats?.totalCompletedEarnings ?? 0}`,
     },
     {
       label: "Rating",
@@ -315,7 +342,7 @@ export default function ProviderDashboard() {
 
   const secondStats = [
     {
-      label: "Pending",
+      label: "Pending / Requested",
       value: dashboardStats?.pendingBookings || 0,
     },
     {
@@ -327,7 +354,19 @@ export default function ProviderDashboard() {
       value: dashboardStats?.completedBookings || 0,
     },
     {
-      label: "Reviews",
+      label: "Rejected",
+      value: dashboardStats?.rejectedBookings || 0,
+    },
+    {
+      label: "Cancelled",
+      value: dashboardStats?.cancelledBookings || 0,
+    },
+    {
+      label: "My Services",
+      value: dashboardStats?.totalServices || 0,
+    },
+    {
+      label: "Total Reviews",
       value: dashboardStats?.totalReviews || 0,
     },
   ];
@@ -433,20 +472,39 @@ export default function ProviderDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-4">
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() =>
+                      toggleServiceAvailability(
+                        service.serviceId,
+                        service.availability
+                      )
+                    }
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                      service.availability
+                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                        : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                    }`}
+                  >
+                    {service.availability
+                      ? "Mark Unavailable"
+                      : "Mark Available"}
+                  </button>
+
                   <button
                     onClick={() =>
                       deleteService(service.serviceId)
                     }
-                    className="w-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
                   >
-                    Delete Service
+                    Delete
                   </button>
                 </div>
               </div>
             ))
           )}
         </div>
+
 
         {/* Upcoming Bookings */}
         <div className="bg-white border border-line rounded-xl p-6 mt-8 shadow-sm">

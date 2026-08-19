@@ -250,7 +250,7 @@ export default function UpcomingBookings() {
                               ? "bg-blue-100 text-blue-700"
                               : booking.status === "COMPLETED"
                               ? "bg-green-100 text-green-700"
-                              : booking.status === "REJECTED"
+                              : booking.status === "REJECTED" || booking.status === "CANCELLED"
                               ? "bg-red-100 text-red-700"
                               : "bg-gray-100 text-gray-700"
                           }`}
@@ -258,6 +258,7 @@ export default function UpcomingBookings() {
                           {booking.status}
                         </span>
                       </div>
+
 
                       {/* CUSTOMER DETAILS */}
                       <div className="border border-line rounded-lg p-4 mb-4">

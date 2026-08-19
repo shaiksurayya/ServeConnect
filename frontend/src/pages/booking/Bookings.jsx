@@ -9,6 +9,7 @@ const statusStyles = {
   IN_PROGRESS: "bg-purple-100 text-purple-700",
   COMPLETED: "bg-green-100 text-green-700",
   CANCELLED: "bg-red-100 text-red-700",
+  REJECTED: "bg-red-100 text-red-700",
 };
 
 function StarPicker({ rating, onChange }) {
@@ -27,6 +28,147 @@ function StarPicker({ rating, onChange }) {
           ★
         </button>
       ))}
+    </div>
+  );
+}
+
+function RescheduleModal({ booking, onClose, onRescheduled }) {
+  const [bookingDate, setBookingDate] = useState(booking.bookingDate || "");
+  const [bookingTime, setBookingTime] = useState(booking.bookingTime || "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (!bookingDate || !bookingTime) {
+      setError("Please select both a valid date and time.");
+      return;
+    }
+
+    if (bookingDate < todayStr) {
+      setError("Booking date cannot be in the past.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login/customer";
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/bookings/customer/${booking.bookingId}/reschedule`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ bookingDate, bookingTime }),
+        }
+      );
+
+      if (!response.ok) {
+        let message = "Unable to reschedule booking. Please try again.";
+
+        try {
+          const body = await response.json();
+          if (body?.message) {
+            message = body.message;
+          }
+        } catch (_) {}
+
+        setError(message);
+        return;
+      }
+
+      const updatedBooking = await response.json();
+      onRescheduled(updatedBooking);
+    } catch (err) {
+      console.error(err);
+      setError(
+        "Something went wrong. Please check your connection and try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-xl border border-line p-6 w-full max-w-md">
+        <h2 className="font-display font-700 text-lg text-ink">
+          Reschedule Booking #{booking.bookingId}
+        </h2>
+
+        <p className="text-sm text-sub mt-1 mb-4">
+          {booking.serviceTitle}
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-ink block mb-1">
+              New Booking Date
+            </label>
+
+            <input
+              type="date"
+              min={todayStr}
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-ink block mb-1">
+              New Booking Time
+            </label>
+
+            <input
+              type="time"
+              value={bookingTime}
+              onChange={(e) => setBookingTime(e.target.value)}
+              className="w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+              required
+            />
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 border border-line text-ink rounded-lg py-2 text-sm font-medium hover:bg-surface transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 bg-primary text-white rounded-lg py-2 text-sm font-medium hover:bg-primaryDark transition-colors disabled:opacity-50"
+            >
+              {submitting ? "Updating..." : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -170,6 +312,7 @@ export default function Bookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reviewingBooking, setReviewingBooking] = useState(null);
+  const [reschedulingBooking, setReschedulingBooking] = useState(null);
   const [justReviewed, setJustReviewed] = useState(null);
 
   useEffect(() => {
@@ -210,6 +353,64 @@ export default function Bookings() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRescheduled = (updatedBooking) => {
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.bookingId === updatedBooking.bookingId ? updatedBooking : b
+      )
+    );
+    setReschedulingBooking(null);
+  };
+
+  const handleCancelBooking = async (bookingId) => {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) {
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      window.location.href = "/login/customer";
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/bookings/customer/${bookingId}/cancel`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        let message = "Unable to cancel booking.";
+        try {
+          const body = await response.json();
+          if (body?.message) {
+            message = body.message;
+          }
+        } catch (_) {}
+        alert(message);
+        return;
+      }
+
+      const updatedBooking = await response.json();
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.bookingId === bookingId ? updatedBooking : b
+        )
+      );
+      alert("Booking cancelled successfully.");
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong while cancelling the booking.");
     }
   };
 
@@ -419,7 +620,7 @@ export default function Bookings() {
                       </p>
 
                       <p className="text-sm font-medium text-ink mt-1 break-all">
-                        📧 {b.providerEmail}
+                        📧 {b.providerEmail || "Not available"}
                       </p>
                     </div>
 
@@ -429,7 +630,7 @@ export default function Bookings() {
                       </p>
 
                       <p className="text-sm font-medium text-ink mt-1">
-                        📞 {b.providerPhone}
+                        📞 {b.providerPhone || "Not available"}
                       </p>
                     </div>
                   </div>
@@ -461,10 +662,28 @@ export default function Bookings() {
                   </div>
                 )}
 
-                {/* Review Action */}
-                {b.status === "COMPLETED" && (
-                  <div className="mt-5 pt-4 border-t border-line flex justify-end">
-                    {b.reviewed ? (
+                {/* Actions */}
+                <div className="mt-5 pt-4 border-t border-line flex flex-wrap justify-end gap-3">
+                  {(b.status === "REQUESTED" || b.status === "ACCEPTED") && (
+                    <>
+                      <button
+                        onClick={() => setReschedulingBooking(b)}
+                        className="text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
+                      >
+                        Reschedule
+                      </button>
+
+                      <button
+                        onClick={() => handleCancelBooking(b.bookingId)}
+                        className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-100 transition-colors"
+                      >
+                        Cancel Booking
+                      </button>
+                    </>
+                  )}
+
+                  {b.status === "COMPLETED" && (
+                    b.reviewed ? (
                       <span className="text-xs font-medium text-sub border border-line rounded-lg px-3 py-1.5">
                         Reviewed
                       </span>
@@ -477,14 +696,23 @@ export default function Bookings() {
                       >
                         Review Provider
                       </button>
-                    )}
-                  </div>
-                )}
+                    )
+                  )}
+                </div>
+
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {reschedulingBooking && (
+        <RescheduleModal
+          booking={reschedulingBooking}
+          onClose={() => setReschedulingBooking(null)}
+          onRescheduled={handleRescheduled}
+        />
+      )}
 
       {reviewingBooking && (
         <ReviewModal

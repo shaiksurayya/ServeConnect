@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
 export default function BookService() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -17,9 +19,10 @@ export default function BookService() {
   });
 
   const [confirmed, setConfirmed] = useState(false);
+  const todayStr = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/services/${id}`)
+    fetch(`${API_URL}/api/services/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Service not found");
         return res.json();
@@ -65,6 +68,16 @@ export default function BookService() {
       return;
     }
 
+    if (!service.availability) {
+      setSubmitError("This service is currently unavailable for booking.");
+      return;
+    }
+
+    if (form.date < todayStr) {
+      setSubmitError("Booking date cannot be in the past.");
+      return;
+    }
+
     const bookingData = {
       serviceId: service.serviceId,
       bookingDate: form.date,
@@ -76,7 +89,7 @@ export default function BookService() {
     setSubmitError("");
 
     try {
-      const response = await fetch("http://localhost:8080/api/bookings/customer", {
+      const response = await fetch(`${API_URL}/api/bookings/customer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -85,20 +98,13 @@ export default function BookService() {
         body: JSON.stringify(bookingData),
       });
 
-      if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        navigate("/login/customer");
-        return;
-      }
-
       if (!response.ok) {
         let message = "Booking failed. Please try again.";
         try {
           const errorBody = await response.json();
           if (errorBody?.message) message = errorBody.message;
         } catch (_) {
-          // response wasn't JSON, keep the default message
+          // response wasn't JSON, keep default
         }
         setSubmitError(message);
         return;
@@ -142,42 +148,61 @@ export default function BookService() {
         {service.title}
       </h2>
 
-      <p className="mt-2">
-        Provider : {service.providerName}
+      <p className="mt-2 text-sm text-gray-600">
+        Provider: <span className="font-semibold text-gray-800">{service.providerName}</span>
       </p>
 
-      <p className="mb-4">
-        Price : ₹{service.price}
+      <p className="mt-1 font-semibold text-lg text-ink">
+        Price: ₹{service.price}
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {!service.availability && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          ⚠️ This service is currently marked as unavailable by the provider and cannot be booked.
+        </div>
+      )}
 
-        <input
-          type="date"
-          name="date"
-          value={form.date}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
+      <form onSubmit={handleSubmit} className="space-y-4 mt-4">
 
-        <input
-          type="time"
-          name="time"
-          value={form.time}
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-          required
-        />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Booking Date</label>
+          <input
+            type="date"
+            name="date"
+            min={todayStr}
+            value={form.date}
+            onChange={handleChange}
+            className="w-full border p-2 rounded text-sm"
+            required
+            disabled={!service.availability}
+          />
+        </div>
 
-        <textarea
-          name="address"
-          value={form.address}
-          onChange={handleChange}
-          placeholder="Address"
-          className="w-full border p-2 rounded"
-          required
-        />
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Booking Time</label>
+          <input
+            type="time"
+            name="time"
+            value={form.time}
+            onChange={handleChange}
+            className="w-full border p-2 rounded text-sm"
+            required
+            disabled={!service.availability}
+          />
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Service Address</label>
+          <textarea
+            name="address"
+            value={form.address}
+            onChange={handleChange}
+            placeholder="Address"
+            className="w-full border p-2 rounded text-sm"
+            required
+            disabled={!service.availability}
+          />
+        </div>
 
         {submitError && (
           <p className="text-sm text-red-600">{submitError}</p>
@@ -185,10 +210,10 @@ export default function BookService() {
 
         <button
           type="submit"
-          disabled={submitting}
-          className="w-full bg-primary text-white p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={submitting || !service.availability}
+          className="w-full bg-primary hover:bg-primaryDark text-white p-2 rounded. font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? "Booking..." : "Confirm Booking"}
+          {submitting ? "Booking..." : service.availability ? "Confirm Booking" : "Service Unavailable"}
         </button>
 
       </form>

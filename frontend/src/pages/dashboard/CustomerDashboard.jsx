@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatCard from '../../components/ui/StatCard'
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
 export default function CustomerDashboard() {
   const navigate = useNavigate()
 
@@ -11,19 +13,18 @@ export default function CustomerDashboard() {
 
   let user = null
 
-try {
-  const storedUser = localStorage.getItem("user")
+  try {
+    const storedUser = localStorage.getItem("user")
 
-  if (storedUser && storedUser !== "undefined") {
-    user = JSON.parse(storedUser)
+    if (storedUser && storedUser !== "undefined") {
+      user = JSON.parse(storedUser)
+    }
+  } catch (error) {
+    console.error("Invalid user data in localStorage:", error)
   }
-} catch (error) {
-  console.error("Invalid user data in localStorage:", error)
-  localStorage.removeItem("user")
-}
 
-const userId = user?.userId
-const token = localStorage.getItem("token")
+  const token = localStorage.getItem("token")
+
   useEffect(() => {
     if (!token) {
       navigate('/login/customer')
@@ -32,34 +33,31 @@ const token = localStorage.getItem("token")
     fetchDashboard()
   }, [navigate, token])
 
-  console.log("User:", user)
-  console.log("User ID:", userId)
-  console.log("Token:", token)
-
   const fetchDashboard = async () => {
     setLoading(true)
     setError('')
     try {
       const response = await fetch(
-        `http://localhost:8080/api/dashboard/customer`,
+        `${API_URL}/api/dashboard/customer`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       )
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          navigate('/login/customer')
-          return
-        }
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error("Backend Error:", errorText)
-          throw new Error('Failed to load dashboard')
-        }
+      if (response.status === 401) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        navigate('/login/customer')
+        return
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Backend Error:", errorText)
+        throw new Error('Failed to load dashboard')
+      }
 
       const data = await response.json()
       setDashboard(data)
@@ -107,15 +105,31 @@ const token = localStorage.getItem("token")
           Here's a look at your bookings.
         </p>
 
-        <div className="grid grid-cols-3 gap-4">
+        {/* Customer Statistics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           <StatCard
-            label="Bookings"
+            label="Total Bookings"
             value={dashboard.totalBookings ?? 0}
+          />
+
+          <StatCard
+            label="Requested"
+            value={dashboard.pendingBookings ?? 0}
+          />
+
+          <StatCard
+            label="Accepted"
+            value={dashboard.acceptedBookings ?? 0}
           />
 
           <StatCard
             label="Completed"
             value={dashboard.completedBookings ?? 0}
+          />
+
+          <StatCard
+            label="Cancelled"
+            value={dashboard.cancelledBookings ?? 0}
           />
 
           <StatCard
@@ -146,7 +160,7 @@ const token = localStorage.getItem("token")
               </span>
             </div>
           ) : (
-            <p>No upcoming bookings.</p>
+            <p className="text-sub text-sm">No upcoming bookings.</p>
           )}
         </div>
 
@@ -156,26 +170,31 @@ const token = localStorage.getItem("token")
           </h2>
 
           {recentBookings.length === 0 ? (
-            <p>No recent bookings.</p>
+            <p className="text-sub text-sm">No recent bookings.</p>
           ) : (
             recentBookings.map((booking) => (
               <div
                 key={booking.bookingId}
-                className="flex items-center justify-between mb-4"
+                className="flex items-center justify-between mb-4 last:mb-0"
               >
                 <div>
                   <div className="text-sm font-semibold text-ink">
                     {booking.serviceName}
                   </div>
 
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-100 text-green-700 inline-block mt-1">
+                  <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full inline-block mt-1 ${
+                    booking.status === 'REQUESTED' ? 'bg-yellow-100 text-yellow-700' :
+                    booking.status === 'ACCEPTED' ? 'bg-blue-100 text-blue-700' :
+                    booking.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
                     {booking.status}
                   </span>
                 </div>
 
                 <button
                   onClick={() => navigate('/bookings')}
-                  className="text-xs font-medium text-primary"
+                  className="text-xs font-medium text-primary hover:underline"
                 >
                   View details →
                 </button>
@@ -190,7 +209,7 @@ const token = localStorage.getItem("token")
           </h2>
 
           {recommendedServices.length === 0 ? (
-            <p>No recommendations available.</p>
+            <p className="text-sub text-sm">No recommendations available.</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {recommendedServices.map((service) => (
