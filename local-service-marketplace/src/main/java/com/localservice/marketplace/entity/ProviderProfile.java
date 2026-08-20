@@ -22,6 +22,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "provider_profiles")
@@ -58,12 +59,18 @@ public class ProviderProfile {
     @Builder.Default
     @Column(name = "avg_rating", precision = 3, scale = 2)
     private BigDecimal avgRating = BigDecimal.ZERO;
+
+    @Column(name = "working_start_time")
+    private LocalTime workingStartTime;
+
+    @Column(name = "working_end_time")
+    private LocalTime workingEndTime;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-
     }
 }

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @NoArgsConstructor
@@ -33,6 +34,10 @@ public class ServiceResponseDTO {
     private Integer duration;
 
     private Boolean availability;
+
+    private LocalTime workingStartTime;
+
+    private LocalTime workingEndTime;
 
     private LocalDateTime createdAt;
 }
