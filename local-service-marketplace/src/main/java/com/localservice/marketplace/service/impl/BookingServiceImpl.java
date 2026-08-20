@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -40,54 +44,98 @@ public class BookingServiceImpl implements BookingService {
         this.serviceRepository = serviceRepository;
     }
 
-    @Override
-    public BookingResponseDTO createBooking(
-            BookingRequestDTO request,
-            String customerEmail) {
+   @Override
+public BookingResponseDTO createBooking(
+        BookingRequestDTO request,
+        String customerEmail) {
 
-        if (request.getBookingDate() == null || request.getBookingDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Booking date cannot be in the past.");
-        }
-
-        if (request.getBookingTime() == null) {
-            throw new IllegalArgumentException("Booking time is required.");
-        }
-
-        User customer = userRepository.findByEmail(customerEmail)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Customer not found for email: "
-                                        + customerEmail));
-
-        com.localservice.marketplace.entity.Service service =
-                serviceRepository.findById(request.getServiceId())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Service not found with id: "
-                                                + request.getServiceId()));
-
-        if (Boolean.FALSE.equals(service.getAvailability())) {
-            throw new IllegalStateException("Service is currently unavailable for booking.");
-        }
-
-        ProviderProfile provider = service.getProvider();
-
-        Booking booking = Booking.builder()
-                .customer(customer)
-                .provider(provider)
-                .service(service)
-                .bookingDate(request.getBookingDate())
-                .bookingTime(request.getBookingTime())
-                .address(request.getAddress())
-                .totalAmount(service.getPrice())
-                .status(BookingStatus.REQUESTED)
-                .paymentMethod("CASH_ON_SERVICE")
-                .build();
-
-        Booking savedBooking = bookingRepository.save(booking);
-
-        return mapToResponseDTO(savedBooking);
+    if (request.getBookingDate() == null) {
+        throw new IllegalArgumentException(
+                "Booking date is required."
+        );
     }
+
+    if (request.getBookingTime() == null) {
+        throw new IllegalArgumentException(
+                "Booking time is required."
+        );
+    }
+
+    LocalDateTime bookingDateTime =
+            LocalDateTime.of(
+                    request.getBookingDate(),
+                    request.getBookingTime()
+            );
+
+    // Prevent booking date/time from being in the past
+    if (bookingDateTime.isBefore(LocalDateTime.now())) {
+        throw new IllegalArgumentException(
+                "Booking date and time cannot be in the past."
+        );
+    }
+
+    User customer = userRepository.findByEmail(customerEmail)
+            .orElseThrow(() ->
+                    new RuntimeException(
+                            "Customer not found for email: "
+                                    + customerEmail));
+
+    com.localservice.marketplace.entity.Service service =
+            serviceRepository.findById(request.getServiceId())
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Service not found with id: "
+                                            + request.getServiceId()));
+
+    // Check service availability
+    if (Boolean.FALSE.equals(service.getAvailability())) {
+        throw new IllegalStateException(
+                "Service is currently unavailable for booking."
+        );
+    }
+
+    /*
+     * Check whether this service already has an active
+     * booking for the selected date and time.
+     */
+    boolean slotAlreadyBooked =
+            bookingRepository
+                    .existsByService_ServiceIdAndBookingDateAndBookingTimeAndStatusIn(
+                            request.getServiceId(),
+                            request.getBookingDate(),
+                            request.getBookingTime(),
+                            List.of(
+                                    BookingStatus.REQUESTED,
+                                    BookingStatus.ACCEPTED,
+                                    BookingStatus.IN_PROGRESS
+                            )
+                    );
+
+    if (slotAlreadyBooked) {
+        throw new IllegalStateException(
+                "This time slot is already booked. Please select another date or time."
+        );
+    }
+
+    ProviderProfile provider = service.getProvider();
+
+    Booking booking = Booking.builder()
+            .customer(customer)
+            .provider(provider)
+            .service(service)
+            .bookingDate(request.getBookingDate())
+            .bookingTime(request.getBookingTime())
+            .address(request.getAddress())
+            .totalAmount(service.getPrice())
+            .status(BookingStatus.REQUESTED)
+            .paymentMethod("CASH_ON_SERVICE")
+            .build();
+
+    Booking savedBooking =
+            bookingRepository.save(booking);
+
+    return mapToResponseDTO(savedBooking);
+}
 
     @Override
     public BookingResponseDTO rescheduleBooking(

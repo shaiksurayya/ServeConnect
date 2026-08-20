@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export default function BookService() {
   const { id } = useParams();
@@ -19,12 +20,16 @@ export default function BookService() {
   });
 
   const [confirmed, setConfirmed] = useState(false);
+
   const todayStr = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     fetch(`${API_URL}/api/services/${id}`)
       .then((res) => {
-        if (!res.ok) throw new Error("Service not found");
+        if (!res.ok) {
+          throw new Error("Service not found");
+        }
+
         return res.json();
       })
       .then((data) => {
@@ -32,7 +37,9 @@ export default function BookService() {
       })
       .catch((err) => {
         console.error(err);
-        setLoadError("Unable to load this service. It may no longer be available.");
+        setLoadError(
+          "Unable to load this service. It may no longer be available."
+        );
       });
   }, [id]);
 
@@ -57,24 +64,46 @@ export default function BookService() {
       ...form,
       [e.target.name]: e.target.value,
     });
+
+    // Clear previous validation error when user changes input
+    setSubmitError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const token = localStorage.getItem("token");
+
     if (!token) {
       navigate("/login/customer");
       return;
     }
 
     if (!service.availability) {
-      setSubmitError("This service is currently unavailable for booking.");
+      setSubmitError(
+        "This service is currently unavailable for booking."
+      );
       return;
     }
 
-    if (form.date < todayStr) {
-      setSubmitError("Booking date cannot be in the past.");
+    // Make sure date and time are selected
+    if (!form.date || !form.time) {
+      setSubmitError(
+        "Please select a booking date and time."
+      );
+      return;
+    }
+
+    // Combine selected date and time
+    const selectedDateTime = new Date(
+      `${form.date}T${form.time}`
+    );
+
+    // Prevent booking in the past
+    if (selectedDateTime < new Date()) {
+      setSubmitError(
+        "Booking date and time cannot be in the past."
+      );
       return;
     }
 
@@ -89,32 +118,45 @@ export default function BookService() {
     setSubmitError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/bookings/customer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify(bookingData),
-      });
+      const response = await fetch(
+        `${API_URL}/api/bookings/customer`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(bookingData),
+        }
+      );
 
       if (!response.ok) {
-        let message = "Booking failed. Please try again.";
+        let message =
+          "Booking failed. Please try again.";
+
         try {
           const errorBody = await response.json();
-          if (errorBody?.message) message = errorBody.message;
+
+          if (errorBody?.message) {
+            message = errorBody.message;
+          }
         } catch (_) {
-          // response wasn't JSON, keep default
+          // Response was not JSON
         }
+
         setSubmitError(message);
         return;
       }
 
       await response.json();
+
       setConfirmed(true);
     } catch (err) {
       console.error(err);
-      setSubmitError("Booking failed. Please check your connection and try again.");
+
+      setSubmitError(
+        "Booking failed. Please check your connection and try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -124,7 +166,9 @@ export default function BookService() {
     return (
       <div className="bg-surface min-h-screen flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl border text-center">
-          <h2 className="text-2xl font-bold mb-3">✅ Booking Confirmed</h2>
+          <h2 className="text-2xl font-bold mb-3">
+            ✅ Booking Confirmed
+          </h2>
 
           <p>
             {service.title} booked successfully.
@@ -149,7 +193,10 @@ export default function BookService() {
       </h2>
 
       <p className="mt-2 text-sm text-gray-600">
-        Provider: <span className="font-semibold text-gray-800">{service.providerName}</span>
+        Provider:{" "}
+        <span className="font-semibold text-gray-800">
+          {service.providerName}
+        </span>
       </p>
 
       <p className="mt-1 font-semibold text-lg text-ink">
@@ -158,14 +205,22 @@ export default function BookService() {
 
       {!service.availability && (
         <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-          ⚠️ This service is currently marked as unavailable by the provider and cannot be booked.
+          ⚠️ This service is currently marked as unavailable
+          by the provider and cannot be booked.
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4 mt-4"
+      >
 
+        {/* Booking Date */}
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Booking Date</label>
+          <label className="text-xs text-gray-500 block mb-1">
+            Booking Date
+          </label>
+
           <input
             type="date"
             name="date"
@@ -178,8 +233,12 @@ export default function BookService() {
           />
         </div>
 
+        {/* Booking Time */}
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Booking Time</label>
+          <label className="text-xs text-gray-500 block mb-1">
+            Booking Time
+          </label>
+
           <input
             type="time"
             name="time"
@@ -191,8 +250,12 @@ export default function BookService() {
           />
         </div>
 
+        {/* Address */}
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Service Address</label>
+          <label className="text-xs text-gray-500 block mb-1">
+            Service Address
+          </label>
+
           <textarea
             name="address"
             value={form.address}
@@ -204,20 +267,29 @@ export default function BookService() {
           />
         </div>
 
+        {/* Error */}
         {submitError && (
-          <p className="text-sm text-red-600">{submitError}</p>
+          <p className="text-sm text-red-600">
+            {submitError}
+          </p>
         )}
 
+        {/* Submit */}
         <button
           type="submit"
-          disabled={submitting || !service.availability}
-          className="w-full bg-primary hover:bg-primaryDark text-white p-2 rounded. font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={
+            submitting || !service.availability
+          }
+          className="w-full bg-primary hover:bg-primaryDark text-white p-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? "Booking..." : service.availability ? "Confirm Booking" : "Service Unavailable"}
+          {submitting
+            ? "Booking..."
+            : service.availability
+            ? "Confirm Booking"
+            : "Service Unavailable"}
         </button>
 
       </form>
-
     </div>
   );
 }
