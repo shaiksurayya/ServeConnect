@@ -16,9 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -44,98 +41,110 @@ public class BookingServiceImpl implements BookingService {
         this.serviceRepository = serviceRepository;
     }
 
-   @Override
-public BookingResponseDTO createBooking(
-        BookingRequestDTO request,
-        String customerEmail) {
+    @Override
+    public BookingResponseDTO createBooking(
+            BookingRequestDTO request,
+            String customerEmail) {
 
-    if (request.getBookingDate() == null) {
-        throw new IllegalArgumentException(
-                "Booking date is required."
-        );
-    }
-
-    if (request.getBookingTime() == null) {
-        throw new IllegalArgumentException(
-                "Booking time is required."
-        );
-    }
-
-    LocalDateTime bookingDateTime =
-            LocalDateTime.of(
-                    request.getBookingDate(),
-                    request.getBookingTime()
+        if (request.getBookingDate() == null) {
+            throw new IllegalArgumentException(
+                    "Booking date is required."
             );
+        }
 
-    // Prevent booking date/time from being in the past
-    if (bookingDateTime.isBefore(LocalDateTime.now())) {
-        throw new IllegalArgumentException(
-                "Booking date and time cannot be in the past."
-        );
+        if (request.getBookingTime() == null) {
+            throw new IllegalArgumentException(
+                    "Booking time is required."
+            );
+        }
+
+        LocalDateTime bookingDateTime =
+                LocalDateTime.of(
+                        request.getBookingDate(),
+                        request.getBookingTime()
+                );
+
+        // Prevent booking date/time from being in the past
+        if (bookingDateTime.isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException(
+                    "Booking date and time cannot be in the past."
+            );
+        }
+
+        User customer = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Customer not found for email: "
+                                        + customerEmail
+                        )
+                );
+
+        com.localservice.marketplace.entity.Service service =
+                serviceRepository.findById(request.getServiceId())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Service not found with id: "
+                                                + request.getServiceId()
+                                )
+                        );
+
+        // Check service availability
+        if (Boolean.FALSE.equals(service.getAvailability())) {
+            throw new IllegalStateException(
+                    "Service is currently unavailable for booking."
+            );
+        }
+
+        /*
+         * Get provider from the selected service.
+         */
+        ProviderProfile provider = service.getProvider();
+
+        /*
+         * Prevent double booking.
+         *
+         * A provider can have only one active booking
+         * for the same date and time.
+         */
+        boolean slotAlreadyBooked =
+                bookingRepository
+                        .existsByProvider_ProviderIdAndBookingDateAndBookingTimeAndStatusIn(
+                                provider.getProviderId(),
+                                request.getBookingDate(),
+                                request.getBookingTime(),
+                                List.of(
+                                        BookingStatus.REQUESTED,
+                                        BookingStatus.ACCEPTED,
+                                        BookingStatus.IN_PROGRESS
+                                )
+                        );
+
+        if (slotAlreadyBooked) {
+            throw new IllegalStateException(
+                    "This time slot is already booked. Please select another date or time."
+            );
+        }
+
+        /*
+         * Create booking.
+         */
+        Booking booking = Booking.builder()
+                .customer(customer)
+                .provider(provider)
+                .service(service)
+                .bookingDate(request.getBookingDate())
+                .bookingTime(request.getBookingTime())
+                .address(request.getAddress())
+                .totalAmount(service.getPrice())
+                .status(BookingStatus.REQUESTED)
+                .paymentMethod("CASH_ON_SERVICE")
+                .build();
+
+        Booking savedBooking =
+                bookingRepository.save(booking);
+
+        return mapToResponseDTO(savedBooking);
     }
-
-    User customer = userRepository.findByEmail(customerEmail)
-            .orElseThrow(() ->
-                    new RuntimeException(
-                            "Customer not found for email: "
-                                    + customerEmail));
-
-    com.localservice.marketplace.entity.Service service =
-            serviceRepository.findById(request.getServiceId())
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Service not found with id: "
-                                            + request.getServiceId()));
-
-    // Check service availability
-    if (Boolean.FALSE.equals(service.getAvailability())) {
-        throw new IllegalStateException(
-                "Service is currently unavailable for booking."
-        );
-    }
-
-    /*
-     * Check whether this service already has an active
-     * booking for the selected date and time.
-     */
-    boolean slotAlreadyBooked =
-            bookingRepository
-                    .existsByService_ServiceIdAndBookingDateAndBookingTimeAndStatusIn(
-                            request.getServiceId(),
-                            request.getBookingDate(),
-                            request.getBookingTime(),
-                            List.of(
-                                    BookingStatus.REQUESTED,
-                                    BookingStatus.ACCEPTED,
-                                    BookingStatus.IN_PROGRESS
-                            )
-                    );
-
-    if (slotAlreadyBooked) {
-        throw new IllegalStateException(
-                "This time slot is already booked. Please select another date or time."
-        );
-    }
-
-    ProviderProfile provider = service.getProvider();
-
-    Booking booking = Booking.builder()
-            .customer(customer)
-            .provider(provider)
-            .service(service)
-            .bookingDate(request.getBookingDate())
-            .bookingTime(request.getBookingTime())
-            .address(request.getAddress())
-            .totalAmount(service.getPrice())
-            .status(BookingStatus.REQUESTED)
-            .paymentMethod("CASH_ON_SERVICE")
-            .build();
-
-    Booking savedBooking =
-            bookingRepository.save(booking);
-
-    return mapToResponseDTO(savedBooking);
-}
 
     @Override
     public BookingResponseDTO rescheduleBooking(
@@ -143,38 +152,98 @@ public BookingResponseDTO createBooking(
             RescheduleRequestDTO request,
             String customerEmail) {
 
-        if (request.getBookingDate() == null || request.getBookingDate().isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("Rescheduled booking date cannot be in the past.");
+        if (request.getBookingDate() == null ||
+                request.getBookingDate().isBefore(LocalDate.now())) {
+
+            throw new IllegalArgumentException(
+                    "Rescheduled booking date cannot be in the past."
+            );
         }
 
         if (request.getBookingTime() == null) {
-            throw new IllegalArgumentException("Booking time is required.");
+            throw new IllegalArgumentException(
+                    "Booking time is required."
+            );
         }
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Booking not found with id: " + bookingId));
+                                "Booking not found with id: "
+                                        + bookingId
+                        )
+                );
 
         User customer = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Customer not found for email: " + customerEmail));
+                                "Customer not found for email: "
+                                        + customerEmail
+                        )
+                );
 
-        if (!booking.getCustomer().getUserId().equals(customer.getUserId())) {
-            throw new RuntimeException("You are not authorized to reschedule this booking");
+        if (!booking.getCustomer()
+                .getUserId()
+                .equals(customer.getUserId())) {
+
+            throw new RuntimeException(
+                    "You are not authorized to reschedule this booking"
+            );
         }
 
         BookingStatus currentStatus = booking.getStatus();
-        if (currentStatus != BookingStatus.REQUESTED && currentStatus != BookingStatus.ACCEPTED) {
+
+        if (currentStatus != BookingStatus.REQUESTED &&
+                currentStatus != BookingStatus.ACCEPTED) {
+
             throw new IllegalStateException(
-                    "Only REQUESTED or ACCEPTED bookings can be rescheduled. Current status: " + currentStatus);
+                    "Only REQUESTED or ACCEPTED bookings can be rescheduled. "
+                            + "Current status: "
+                            + currentStatus
+            );
         }
 
+        /*
+         * Check whether the new slot is already occupied.
+         */
+        boolean slotAlreadyBooked =
+                bookingRepository
+                        .existsByProvider_ProviderIdAndBookingDateAndBookingTimeAndStatusIn(
+                                booking.getProvider().getProviderId(),
+                                request.getBookingDate(),
+                                request.getBookingTime(),
+                                List.of(
+                                        BookingStatus.REQUESTED,
+                                        BookingStatus.ACCEPTED,
+                                        BookingStatus.IN_PROGRESS
+                                )
+                        );
+
+        /*
+         * If the customer selected the exact same slot
+         * that this booking already has, allow it.
+         */
+        boolean sameSlot =
+                booking.getBookingDate()
+                        .equals(request.getBookingDate())
+                        &&
+                booking.getBookingTime()
+                        .equals(request.getBookingTime());
+
+        if (slotAlreadyBooked && !sameSlot) {
+            throw new IllegalStateException(
+                    "This time slot is already booked. Please select another date or time."
+            );
+        }
+
+        /*
+         * Update booking date and time.
+         */
         booking.setBookingDate(request.getBookingDate());
         booking.setBookingTime(request.getBookingTime());
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking =
+                bookingRepository.save(booking);
 
         return mapToResponseDTO(savedBooking);
     }
@@ -187,30 +256,47 @@ public BookingResponseDTO createBooking(
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Booking not found with id: " + bookingId));
+                                "Booking not found with id: "
+                                        + bookingId
+                        )
+                );
 
         User customer = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Customer not found for email: " + customerEmail));
+                                "Customer not found for email: "
+                                        + customerEmail
+                        )
+                );
 
-        if (!booking.getCustomer().getUserId().equals(customer.getUserId())) {
-            throw new RuntimeException("You are not authorized to cancel this booking");
+        if (!booking.getCustomer()
+                .getUserId()
+                .equals(customer.getUserId())) {
+
+            throw new RuntimeException(
+                    "You are not authorized to cancel this booking"
+            );
         }
 
         BookingStatus currentStatus = booking.getStatus();
-        if (currentStatus != BookingStatus.REQUESTED && currentStatus != BookingStatus.ACCEPTED) {
+
+        if (currentStatus != BookingStatus.REQUESTED &&
+                currentStatus != BookingStatus.ACCEPTED) {
+
             throw new IllegalStateException(
-                    "Only REQUESTED or ACCEPTED bookings can be cancelled. Current status: " + currentStatus);
+                    "Only REQUESTED or ACCEPTED bookings can be cancelled. "
+                            + "Current status: "
+                            + currentStatus
+            );
         }
 
         booking.setStatus(BookingStatus.CANCELLED);
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking =
+                bookingRepository.save(booking);
 
         return mapToResponseDTO(savedBooking);
     }
-
 
     @Override
     public List<BookingResponseDTO> getAllBookings() {
@@ -228,7 +314,9 @@ public BookingResponseDTO createBooking(
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Booking not found with id: "
-                                        + bookingId));
+                                        + bookingId
+                        )
+                );
 
         return mapToResponseDTO(booking);
     }
@@ -241,7 +329,9 @@ public BookingResponseDTO createBooking(
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Customer not found for email: "
-                                        + customerEmail));
+                                        + customerEmail
+                        )
+                );
 
         return bookingRepository
                 .findByCustomer_UserId(customer.getUserId())
@@ -260,7 +350,9 @@ public BookingResponseDTO createBooking(
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Provider not found for email: "
-                                                + providerEmail));
+                                                + providerEmail
+                                )
+                        );
 
         List<Booking> bookings =
                 bookingRepository.findByProvider_ProviderId(
@@ -283,12 +375,7 @@ public BookingResponseDTO createBooking(
     }
 
     /*
-     * Existing Accept / Complete status endpoint.
-     *
-     * We keep this endpoint because your Accept and Complete
-     * functionality is already working.
-     *
-     * Valid transitions:
+     * Accept / Complete status endpoint.
      *
      * REQUESTED -> ACCEPTED
      * ACCEPTED  -> COMPLETED
@@ -303,7 +390,9 @@ public BookingResponseDTO createBooking(
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Booking not found with id: "
-                                        + bookingId));
+                                        + bookingId
+                        )
+                );
 
         ProviderProfile provider =
                 providerProfileRepository
@@ -311,15 +400,17 @@ public BookingResponseDTO createBooking(
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Provider not found for email: "
-                                                + providerEmail));
+                                                + providerEmail
+                                )
+                        );
 
-        // Make sure this booking belongs to the logged-in provider.
         if (!booking.getProvider()
                 .getProviderId()
                 .equals(provider.getProviderId())) {
 
             throw new RuntimeException(
-                    "You are not authorized to update this booking");
+                    "You are not authorized to update this booking"
+            );
         }
 
         BookingStatus currentStatus = booking.getStatus();
@@ -334,7 +425,8 @@ public BookingResponseDTO createBooking(
                 throw new IllegalStateException(
                         "Only REQUESTED bookings can be accepted. "
                                 + "Current status: "
-                                + currentStatus);
+                                + currentStatus
+                );
             }
         }
 
@@ -348,18 +440,19 @@ public BookingResponseDTO createBooking(
                 throw new IllegalStateException(
                         "Only ACCEPTED bookings can be completed. "
                                 + "Current status: "
-                                + currentStatus);
+                                + currentStatus
+                );
             }
         }
 
         /*
-         * Do not allow Reject through the generic endpoint.
-         * Reject has its own endpoint below.
+         * Reject is handled by the dedicated endpoint.
          */
         else if (status == BookingStatus.REJECTED) {
 
             throw new IllegalStateException(
-                    "Use the reject booking endpoint for rejecting bookings.");
+                    "Use the reject booking endpoint for rejecting bookings."
+            );
         }
 
         booking.setStatus(status);
@@ -373,11 +466,7 @@ public BookingResponseDTO createBooking(
     /*
      * Dedicated Reject operation.
      *
-     * Only:
-     *
      * REQUESTED -> REJECTED
-     *
-     * is allowed.
      */
     @Override
     public BookingResponseDTO rejectBooking(
@@ -388,7 +477,9 @@ public BookingResponseDTO createBooking(
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Booking not found with id: "
-                                        + bookingId));
+                                        + bookingId
+                        )
+                );
 
         ProviderProfile provider =
                 providerProfileRepository
@@ -396,33 +487,28 @@ public BookingResponseDTO createBooking(
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Provider not found for email: "
-                                                + providerEmail));
+                                                + providerEmail
+                                )
+                        );
 
-        /*
-         * Verify that the booking belongs to this provider.
-         */
         if (!booking.getProvider()
                 .getProviderId()
                 .equals(provider.getProviderId())) {
 
             throw new RuntimeException(
-                    "You are not authorized to reject this booking");
+                    "You are not authorized to reject this booking"
+            );
         }
 
-        /*
-         * Reject is allowed ONLY from REQUESTED.
-         */
         if (booking.getStatus() != BookingStatus.REQUESTED) {
 
             throw new IllegalStateException(
                     "Only REQUESTED bookings can be rejected. "
                             + "Current status: "
-                            + booking.getStatus());
+                            + booking.getStatus()
+            );
         }
 
-        /*
-         * Change ONLY this booking.
-         */
         booking.setStatus(BookingStatus.REJECTED);
 
         Booking updatedBooking =
@@ -440,99 +526,99 @@ public BookingResponseDTO createBooking(
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Booking not found with id: "
-                                        + bookingId));
+                                        + bookingId
+                        )
+                );
 
         User customer =
                 userRepository.findByEmail(customerEmail)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Customer not found for email: "
-                                                + customerEmail));
+                                                + customerEmail
+                                )
+                        );
 
         if (!booking.getCustomer()
                 .getUserId()
                 .equals(customer.getUserId())) {
 
             throw new RuntimeException(
-                    "You are not authorized to delete this booking");
+                    "You are not authorized to delete this booking"
+            );
         }
 
         bookingRepository.delete(booking);
     }
 
-//     private BookingResponseDTO mapToResponseDTO(
-//             Booking booking) {
+    private BookingResponseDTO mapToResponseDTO(
+            Booking booking) {
 
-//         return BookingResponseDTO.builder()
-//                 .bookingId(booking.getBookingId())
-//                 .customerId(booking.getCustomer().getUserId())
-//                 .customerName(booking.getCustomer().getName())
-//                 .providerId(booking.getProvider().getProviderId())
-//                 .providerName(
-//                         booking.getProvider()
-//                                 .getUser()
-//                                 .getName()
-//                 )
-//                 .serviceId(
-//                         booking.getService()
-//                                 .getServiceId()
-//                 )
-//                 .serviceTitle(
-//                         booking.getService()
-//                                 .getTitle()
-//                 )
-//                 .bookingDate(booking.getBookingDate())
-//                 .bookingTime(booking.getBookingTime())
-//                 .address(booking.getAddress())
-//                 .totalAmount(booking.getTotalAmount())
-//                 .status(booking.getStatus())
-//                 .paymentMethod(booking.getPaymentMethod())
-//                 .createdAt(booking.getCreatedAt())
-//                 .build();
-//     }
-private BookingResponseDTO mapToResponseDTO(
-        Booking booking) {
+        return BookingResponseDTO.builder()
+                .bookingId(booking.getBookingId())
 
-    return BookingResponseDTO.builder()
-            .bookingId(booking.getBookingId())
+                .customerId(
+                        booking.getCustomer().getUserId()
+                )
+                .customerName(
+                        booking.getCustomer().getName()
+                )
+                .customerEmail(
+                        booking.getCustomer().getEmail()
+                )
+                .customerPhone(
+                        booking.getCustomer().getPhone()
+                )
 
-            .customerId(booking.getCustomer().getUserId())
-            .customerName(booking.getCustomer().getName())
-            .customerEmail(booking.getCustomer().getEmail())
-            .customerPhone(booking.getCustomer().getPhone())
+                .providerId(
+                        booking.getProvider().getProviderId()
+                )
+                .providerName(
+                        booking.getProvider()
+                                .getUser()
+                                .getName()
+                )
+                .providerEmail(
+                        booking.getProvider()
+                                .getUser()
+                                .getEmail()
+                )
+                .providerPhone(
+                        booking.getProvider()
+                                .getUser()
+                                .getPhone()
+                )
 
-            .providerId(booking.getProvider().getProviderId())
-            .providerName(
-                    booking.getProvider()
-                            .getUser()
-                            .getName()
-            )
-            .providerEmail(
-                    booking.getProvider()
-                            .getUser()
-                            .getEmail()
-            )
-            .providerPhone(
-                    booking.getProvider()
-                            .getUser()
-                            .getPhone()
-            )
+                .serviceId(
+                        booking.getService()
+                                .getServiceId()
+                )
+                .serviceTitle(
+                        booking.getService()
+                                .getTitle()
+                )
 
-            .serviceId(
-                    booking.getService()
-                            .getServiceId()
-            )
-            .serviceTitle(
-                    booking.getService()
-                            .getTitle()
-            )
-            .bookingDate(booking.getBookingDate())
-            .bookingTime(booking.getBookingTime())
-            .address(booking.getAddress())
-            .totalAmount(booking.getTotalAmount())
-            .status(booking.getStatus())
-            .paymentMethod(booking.getPaymentMethod())
-            .createdAt(booking.getCreatedAt())
-            .build();
-}
+                .bookingDate(
+                        booking.getBookingDate()
+                )
+                .bookingTime(
+                        booking.getBookingTime()
+                )
+                .address(
+                        booking.getAddress()
+                )
+                .totalAmount(
+                        booking.getTotalAmount()
+                )
+                .status(
+                        booking.getStatus()
+                )
+                .paymentMethod(
+                        booking.getPaymentMethod()
+                )
+                .createdAt(
+                        booking.getCreatedAt()
+                )
+                .build();
+    }
 }

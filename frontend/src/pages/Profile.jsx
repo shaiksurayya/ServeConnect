@@ -164,78 +164,100 @@ export default function Profile() {
     setError("");
   };
 
-  const saveProfile = async () => {
-    const token = localStorage.getItem("token");
+ const saveProfile = async () => {
+  const token = localStorage.getItem("token");
 
-    if (!token) {
-      navigate("/login/customer");
-      return;
-    }
+  if (!token) {
+    navigate("/login/customer");
+    return;
+  }
 
-    // Validate working hours
-    if (
-      form.workingStartTime &&
-      form.workingEndTime &&
-      form.workingStartTime >= form.workingEndTime
-    ) {
-      setError(
-        "Working end time must be after working start time."
-      );
-      return;
-    }
+  // Validate working hours only for providers
+  if (
+    isProvider &&
+    form.workingStartTime &&
+    form.workingEndTime &&
+    form.workingStartTime >= form.workingEndTime
+  ) {
+    setError(
+      "Working end time must be after working start time."
+    );
+    return;
+  }
 
-    setSaving(true);
-    setMessage("");
-    setError("");
+  setSaving(true);
+  setMessage("");
+  setError("");
 
-    try {
-      const response = await fetch(
-        `${API_URL}/api/provider/profile`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(form),
+  try {
+    const endpoint = isProvider
+      ? `${API_URL}/api/provider/profile`
+      : `${API_URL}/api/customer/profile`;
+
+    const requestBody = isProvider
+      ? {
+          name: form.name,
+          phone: form.phone,
+          address: form.address,
+          experience:
+            form.experience === ""
+              ? ""
+              : String(form.experience),
+          description: form.description,
+          workingStartTime:
+            form.workingStartTime || "",
+          workingEndTime:
+            form.workingEndTime || "",
         }
-      );
+      : {
+          name: form.name,
+          phone: form.phone,
+          address: form.address,
+        };
 
-      if (!response.ok) {
-        let errorMessage =
-          "Failed to update profile.";
+    const response = await fetch(endpoint, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
 
-        try {
-          const errorBody = await response.json();
+    if (!response.ok) {
+      let errorMessage = "Failed to update profile.";
 
-          if (errorBody?.message) {
-            errorMessage = errorBody.message;
-          }
-        } catch (_) {
-          // Response wasn't JSON
+      try {
+        const errorBody = await response.json();
+
+        if (errorBody?.message) {
+          errorMessage = errorBody.message;
         }
-
-        setError(errorMessage);
-        return;
+      } catch (_) {
+        // Response wasn't JSON
       }
 
-      setMessage(
-        "Profile updated successfully."
-      );
-
-      setEditing(false);
-
-      await fetchUser();
-    } catch (error) {
-      console.error(error);
-
-      setError(
-        "Unable to update profile. Please try again."
-      );
-    } finally {
-      setSaving(false);
+      setError(errorMessage);
+      return;
     }
-  };
+
+    setMessage("Profile updated successfully.");
+
+    setEditing(false);
+
+    // Reload latest profile data
+    await fetchUser();
+
+  } catch (error) {
+    console.error("Profile update error:", error);
+
+    setError(
+      "Unable to update profile. Please try again."
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   const logout = () => {
     localStorage.removeItem("token");
