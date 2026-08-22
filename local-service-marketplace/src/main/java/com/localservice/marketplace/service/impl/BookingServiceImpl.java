@@ -7,11 +7,13 @@ import com.localservice.marketplace.entity.Booking;
 import com.localservice.marketplace.entity.ProviderProfile;
 import com.localservice.marketplace.entity.User;
 import com.localservice.marketplace.enums.BookingStatus;
+import com.localservice.marketplace.enums.NotificationType;
 import com.localservice.marketplace.repository.BookingRepository;
 import com.localservice.marketplace.repository.ProviderProfileRepository;
 import com.localservice.marketplace.repository.ServiceRepository;
 import com.localservice.marketplace.repository.UserRepository;
 import com.localservice.marketplace.service.BookingService;
+import com.localservice.marketplace.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,17 +30,20 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final ProviderProfileRepository providerProfileRepository;
     private final ServiceRepository serviceRepository;
+    private final NotificationService notificationService;
 
     public BookingServiceImpl(
             BookingRepository bookingRepository,
             UserRepository userRepository,
             ProviderProfileRepository providerProfileRepository,
-            ServiceRepository serviceRepository) {
+            ServiceRepository serviceRepository,
+            NotificationService notificationService) {
 
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.providerProfileRepository = providerProfileRepository;
         this.serviceRepository = serviceRepository;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -64,7 +69,6 @@ public class BookingServiceImpl implements BookingService {
                         request.getBookingTime()
                 );
 
-        // Prevent booking date/time from being in the past
         if (bookingDateTime.isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException(
                     "Booking date and time cannot be in the past."
@@ -88,24 +92,14 @@ public class BookingServiceImpl implements BookingService {
                                 )
                         );
 
-        // Check service availability
         if (Boolean.FALSE.equals(service.getAvailability())) {
             throw new IllegalStateException(
                     "Service is currently unavailable for booking."
             );
         }
 
-        /*
-         * Get provider from the selected service.
-         */
         ProviderProfile provider = service.getProvider();
 
-        /*
-         * Prevent double booking.
-         *
-         * A provider can have only one active booking
-         * for the same date and time.
-         */
         boolean slotAlreadyBooked =
                 bookingRepository
                         .existsByProvider_ProviderIdAndBookingDateAndBookingTimeAndStatusIn(
@@ -125,9 +119,6 @@ public class BookingServiceImpl implements BookingService {
             );
         }
 
-        /*
-         * Create booking.
-         */
         Booking booking = Booking.builder()
                 .customer(customer)
                 .provider(provider)
@@ -142,6 +133,13 @@ public class BookingServiceImpl implements BookingService {
 
         Booking savedBooking =
                 bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                provider.getUser(),
+                "New booking request for " + service.getTitle(),
+                NotificationType.NEW_BOOKING,
+                savedBooking.getBookingId()
+        );
 
         return mapToResponseDTO(savedBooking);
     }
@@ -203,9 +201,6 @@ public class BookingServiceImpl implements BookingService {
             );
         }
 
-        /*
-         * Check whether the new slot is already occupied.
-         */
         boolean slotAlreadyBooked =
                 bookingRepository
                         .existsByProvider_ProviderIdAndBookingDateAndBookingTimeAndStatusIn(
@@ -219,10 +214,6 @@ public class BookingServiceImpl implements BookingService {
                                 )
                         );
 
-        /*
-         * If the customer selected the exact same slot
-         * that this booking already has, allow it.
-         */
         boolean sameSlot =
                 booking.getBookingDate()
                         .equals(request.getBookingDate())
@@ -236,9 +227,6 @@ public class BookingServiceImpl implements BookingService {
             );
         }
 
-        /*
-         * Update booking date and time.
-         */
         booking.setBookingDate(request.getBookingDate());
         booking.setBookingTime(request.getBookingTime());
 
@@ -294,6 +282,14 @@ public class BookingServiceImpl implements BookingService {
 
         Booking savedBooking =
                 bookingRepository.save(booking);
+
+        notificationService.createNotification(
+                booking.getProvider().getUser(),
+                "Booking for " + booking.getService().getTitle()
+                        + " has been cancelled by the customer.",
+                NotificationType.BOOKING_CANCELLED,
+                booking.getBookingId()
+        );
 
         return mapToResponseDTO(savedBooking);
     }
@@ -374,12 +370,6 @@ public class BookingServiceImpl implements BookingService {
                 .collect(Collectors.toList());
     }
 
-    /*
-     * Accept / Complete status endpoint.
-     *
-     * REQUESTED -> ACCEPTED
-     * ACCEPTED  -> COMPLETED
-     */
     @Override
     public BookingResponseDTO updateBookingStatus(
             Long bookingId,
@@ -415,9 +405,6 @@ public class BookingServiceImpl implements BookingService {
 
         BookingStatus currentStatus = booking.getStatus();
 
-        /*
-         * Accept
-         */
         if (status == BookingStatus.ACCEPTED) {
 
             if (currentStatus != BookingStatus.REQUESTED) {
@@ -430,9 +417,6 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        /*
-         * Complete
-         */
         else if (status == BookingStatus.COMPLETED) {
 
             if (currentStatus != BookingStatus.ACCEPTED) {
@@ -445,9 +429,6 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        /*
-         * Reject is handled by the dedicated endpoint.
-         */
         else if (status == BookingStatus.REJECTED) {
 
             throw new IllegalStateException(
@@ -460,14 +441,32 @@ public class BookingServiceImpl implements BookingService {
         Booking updatedBooking =
                 bookingRepository.save(booking);
 
+        if (status == BookingStatus.ACCEPTED) {
+
+            notificationService.createNotification(
+                    booking.getCustomer(),
+                    "Your booking for "
+                            + booking.getService().getTitle()
+                            + " has been accepted.",
+                    NotificationType.BOOKING_ACCEPTED,
+                    booking.getBookingId()
+            );
+
+        } else if (status == BookingStatus.COMPLETED) {
+
+            notificationService.createNotification(
+                    booking.getCustomer(),
+                    "Your booking for "
+                            + booking.getService().getTitle()
+                            + " has been completed.",
+                    NotificationType.BOOKING_COMPLETED,
+                    booking.getBookingId()
+            );
+        }
+
         return mapToResponseDTO(updatedBooking);
     }
 
-    /*
-     * Dedicated Reject operation.
-     *
-     * REQUESTED -> REJECTED
-     */
     @Override
     public BookingResponseDTO rejectBooking(
             Long bookingId,
@@ -488,8 +487,8 @@ public class BookingServiceImpl implements BookingService {
                                 new RuntimeException(
                                         "Provider not found for email: "
                                                 + providerEmail
-                                )
-                        );
+                        )
+                );
 
         if (!booking.getProvider()
                 .getProviderId()
@@ -514,6 +513,15 @@ public class BookingServiceImpl implements BookingService {
         Booking updatedBooking =
                 bookingRepository.save(booking);
 
+        notificationService.createNotification(
+                booking.getCustomer(),
+                "Your booking for "
+                        + booking.getService().getTitle()
+                        + " has been rejected by the provider.",
+                NotificationType.BOOKING_REJECTED,
+                booking.getBookingId()
+        );
+
         return mapToResponseDTO(updatedBooking);
     }
 
@@ -536,7 +544,7 @@ public class BookingServiceImpl implements BookingService {
                                 new RuntimeException(
                                         "Customer not found for email: "
                                                 + customerEmail
-                                )
+                        )
                         );
 
         if (!booking.getCustomer()

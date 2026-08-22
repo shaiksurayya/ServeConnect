@@ -1,5 +1,6 @@
 package com.localservice.marketplace.entity;
 
+import com.localservice.marketplace.enums.NotificationType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -30,8 +31,9 @@ public class Notification {
     @Column(name = "message", nullable = false, length = 500)
     private String message;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "type")
-    private String type;
+    private NotificationType type;
 
     @Column(name = "related_booking_id")
     private Long relatedBookingId;
@@ -46,6 +48,7 @@ public class Notification {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+
         if (this.isRead == null) {
             this.isRead = false;
         }
