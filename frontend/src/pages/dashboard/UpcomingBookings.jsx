@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080";
@@ -13,6 +14,8 @@ const statusStyles = {
 };
 
 export default function UpcomingBookings() {
+  const location = useLocation();
+
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingBookingId, setProcessingBookingId] =
@@ -20,6 +23,10 @@ export default function UpcomingBookings() {
 
   const [activeTab, setActiveTab] =
     useState("upcoming");
+
+  // Booking ID received from notification
+  const selectedBookingId =
+    location.state?.bookingId;
 
   const token = localStorage.getItem("token");
 
@@ -56,6 +63,54 @@ export default function UpcomingBookings() {
       setLoading(false);
     }
   };
+
+  /* =========================================================
+     OPEN EXACT BOOKING FROM NOTIFICATION
+  ========================================================= */
+
+  useEffect(() => {
+    if (!selectedBookingId || bookings.length === 0) {
+      return;
+    }
+
+    const selectedBooking = bookings.find(
+      (booking) =>
+        String(booking.bookingId) ===
+        String(selectedBookingId)
+    );
+
+    if (!selectedBooking) {
+      return;
+    }
+
+    // Automatically open the correct tab
+    if (
+      selectedBooking.status === "COMPLETED"
+    ) {
+      setActiveTab("completed");
+    } else if (
+      selectedBooking.status === "REJECTED" ||
+      selectedBooking.status === "CANCELLED"
+    ) {
+      setActiveTab("cancelled");
+    } else {
+      setActiveTab("upcoming");
+    }
+
+    // Scroll to the exact booking after rendering
+    setTimeout(() => {
+      const element = document.getElementById(
+        `booking-${selectedBooking.bookingId}`
+      );
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 100);
+  }, [selectedBookingId, bookings]);
 
   /* =========================================================
      ACCEPT BOOKING
@@ -165,7 +220,6 @@ export default function UpcomingBookings() {
 
       alert("Booking rejected successfully.");
 
-      // Move provider to cancelled tab
       setActiveTab("cancelled");
     } catch (error) {
       console.error("Reject booking error:", error);
@@ -223,7 +277,6 @@ export default function UpcomingBookings() {
         "Booking marked as completed successfully."
       );
 
-      // Move provider to completed tab
       setActiveTab("completed");
     } catch (error) {
       console.error(
@@ -296,9 +349,7 @@ export default function UpcomingBookings() {
     <div className="bg-surface min-h-[calc(100vh-73px)]">
       <div className="max-w-6xl mx-auto px-6 py-10">
 
-        {/* =================================================
-            PAGE HEADER
-        ================================================= */}
+        {/* PAGE HEADER */}
 
         <div className="mb-8">
           <h1 className="font-display font-bold text-3xl text-ink">
@@ -310,13 +361,12 @@ export default function UpcomingBookings() {
           </p>
         </div>
 
-        {/* =================================================
-            TABS
-        ================================================= */}
+        {/* TABS */}
 
         <div className="bg-white border border-line rounded-xl p-2 mb-8 grid grid-cols-3 gap-2">
 
           {/* UPCOMING */}
+
           <button
             type="button"
             onClick={() =>
@@ -344,6 +394,7 @@ export default function UpcomingBookings() {
           </button>
 
           {/* COMPLETED */}
+
           <button
             type="button"
             onClick={() =>
@@ -371,6 +422,7 @@ export default function UpcomingBookings() {
           </button>
 
           {/* CANCELLED */}
+
           <button
             type="button"
             onClick={() =>
@@ -398,9 +450,7 @@ export default function UpcomingBookings() {
           </button>
         </div>
 
-        {/* =================================================
-            ACTIVE TAB HEADER
-        ================================================= */}
+        {/* ACTIVE TAB HEADER */}
 
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -433,9 +483,7 @@ export default function UpcomingBookings() {
           </span>
         </div>
 
-        {/* =================================================
-            EMPTY STATE
-        ================================================= */}
+        {/* EMPTY STATE */}
 
         {activeBookings.length === 0 ? (
           <div className="bg-white border border-line rounded-xl p-10 shadow-sm text-center">
@@ -469,9 +517,8 @@ export default function UpcomingBookings() {
             </p>
           </div>
         ) : (
-          /* =================================================
-             BOOKING CARDS
-          ================================================= */
+
+          /* BOOKING CARDS */
 
           <div className="space-y-5">
             {activeBookings.map((booking) => {
@@ -479,25 +526,41 @@ export default function UpcomingBookings() {
                 processingBookingId ===
                 booking.bookingId;
 
+              const isSelected =
+                String(booking.bookingId) ===
+                String(selectedBookingId);
+
               return (
                 <div
                   key={booking.bookingId}
-                  className="bg-white border border-line rounded-xl p-6 shadow-sm"
+                  id={`booking-${booking.bookingId}`}
+                  className={`bg-white rounded-xl p-6 shadow-sm transition-all duration-500 ${
+                    isSelected
+                      ? "border-2 border-primary ring-4 ring-primary/20 shadow-lg"
+                      : "border border-line"
+                  }`}
                 >
 
-                  {/* =========================================
-                      TOP SECTION
-                  ========================================= */}
+                  {/* Notification Selected Label */}
+
+                  {isSelected && (
+                    <div className="mb-4">
+                      <span className="inline-flex items-center gap-2 bg-primaryLight text-primary px-3 py-1.5 rounded-full text-xs font-semibold">
+                        🔔 Opened from notification
+                      </span>
+                    </div>
+                  )}
+
+                  {/* TOP SECTION */}
 
                   <div className="flex flex-col md:flex-row md:justify-between gap-5">
 
-                    {/* =======================================
-                        LEFT SIDE
-                    ======================================= */}
+                    {/* LEFT SIDE */}
 
                     <div className="flex-1">
 
                       {/* SERVICE TITLE + STATUS */}
+
                       <div className="flex flex-wrap items-center gap-3 mb-5">
 
                         <h2 className="font-semibold text-xl text-ink">
@@ -516,9 +579,7 @@ export default function UpcomingBookings() {
                         </span>
                       </div>
 
-                      {/* =====================================
-                          CUSTOMER DETAILS
-                      ===================================== */}
+                      {/* CUSTOMER DETAILS */}
 
                       <div className="border border-line rounded-lg p-4 mb-4">
                         <h3 className="font-semibold text-sm text-ink mb-3">
@@ -553,9 +614,7 @@ export default function UpcomingBookings() {
                         </div>
                       </div>
 
-                      {/* =====================================
-                          SERVICE DETAILS
-                      ===================================== */}
+                      {/* SERVICE DETAILS */}
 
                       <div className="border border-line rounded-lg p-4 mb-4">
                         <h3 className="font-semibold text-sm text-ink mb-3">
@@ -595,9 +654,7 @@ export default function UpcomingBookings() {
                         </div>
                       </div>
 
-                      {/* =====================================
-                          PAYMENT DETAILS
-                      ===================================== */}
+                      {/* PAYMENT DETAILS */}
 
                       <div className="border border-line rounded-lg p-4">
                         <h3 className="font-semibold text-sm text-ink mb-3">
@@ -624,13 +681,12 @@ export default function UpcomingBookings() {
                       </div>
                     </div>
 
-                    {/* =======================================
-                        RIGHT SIDE - ACTIONS
-                    ======================================= */}
+                    {/* RIGHT SIDE - ACTIONS */}
 
                     <div className="flex flex-col items-start md:items-end gap-4">
 
                       {/* REQUESTED */}
+
                       {booking.status === "REQUESTED" && (
                         <div className="flex gap-3">
 
@@ -676,6 +732,7 @@ export default function UpcomingBookings() {
                       )}
 
                       {/* ACCEPTED */}
+
                       {booking.status === "ACCEPTED" && (
                         <button
                           type="button"

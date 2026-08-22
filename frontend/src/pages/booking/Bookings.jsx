@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080";
@@ -343,11 +344,28 @@ function BookingCard({
   onCancel,
   onReview,
   justReviewed,
+  isSelected,
 }) {
   const b = booking;
 
   return (
-    <div className="bg-white border border-line rounded-xl p-6 shadow-sm">
+    <div
+      id={`booking-${b.bookingId}`}
+      className={`bg-white rounded-xl p-6 shadow-sm transition-all duration-500 ${
+        isSelected
+          ? "border-2 border-primary ring-4 ring-primary/20 shadow-lg"
+          : "border border-line"
+      }`}
+    >
+      {/* Notification Highlight */}
+      {isSelected && (
+        <div className="mb-4">
+          <span className="inline-flex items-center gap-2 bg-primaryLight text-primary px-3 py-1.5 rounded-full text-xs font-semibold">
+            🔔 Opened from notification
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -517,8 +535,6 @@ function BookingCard({
 
       {/* Actions */}
       <div className="mt-5 pt-4 border-t border-line flex flex-wrap justify-end gap-3">
-
-        {/* Requested / Accepted */}
         {(b.status === "REQUESTED" ||
           b.status === "ACCEPTED") && (
           <>
@@ -538,7 +554,6 @@ function BookingCard({
           </>
         )}
 
-        {/* Completed */}
         {b.status === "COMPLETED" &&
           (b.reviewed ? (
             <span className="text-xs font-medium text-sub border border-line rounded-lg px-3 py-1.5">
@@ -562,6 +577,11 @@ function BookingCard({
 ========================================================= */
 
 export default function Bookings() {
+  const location = useLocation();
+
+  const selectedBookingId =
+    location.state?.bookingId;
+
   const [bookings, setBookings] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -627,6 +647,52 @@ export default function Bookings() {
       setLoading(false);
     }
   };
+
+  /* =======================================================
+     OPEN EXACT BOOKING FROM NOTIFICATION
+  ======================================================= */
+
+  useEffect(() => {
+    if (!selectedBookingId || bookings.length === 0) {
+      return;
+    }
+
+    const selectedBooking = bookings.find(
+      (booking) =>
+        String(booking.bookingId) ===
+        String(selectedBookingId)
+    );
+
+    if (!selectedBooking) {
+      return;
+    }
+
+    // Select the correct tab
+    if (selectedBooking.status === "COMPLETED") {
+      setActiveTab("completed");
+    } else if (
+      selectedBooking.status === "CANCELLED" ||
+      selectedBooking.status === "REJECTED"
+    ) {
+      setActiveTab("cancelled");
+    } else {
+      setActiveTab("upcoming");
+    }
+
+    // Scroll after tab/content has rendered
+    setTimeout(() => {
+      const element = document.getElementById(
+        `booking-${selectedBooking.bookingId}`
+      );
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 200);
+  }, [selectedBookingId, bookings]);
 
   /* =======================================================
      RESCHEDULE
@@ -703,7 +769,6 @@ export default function Bookings() {
 
       alert("Booking cancelled successfully.");
 
-      // Automatically move customer to Cancelled tab
       setActiveTab("cancelled");
     } catch (err) {
       console.error(err);
@@ -825,6 +890,7 @@ export default function Bookings() {
       <div className="max-w-5xl mx-auto px-6 py-12">
 
         {/* Page Header */}
+
         <div className="mb-8">
           <h1 className="font-display font-700 text-2xl text-ink">
             My Bookings
@@ -842,6 +908,7 @@ export default function Bookings() {
         <div className="bg-white border border-line rounded-xl p-2 mb-8 grid grid-cols-3 gap-2">
 
           {/* Upcoming */}
+
           <button
             onClick={() => setActiveTab("upcoming")}
             className={`rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
@@ -866,6 +933,7 @@ export default function Bookings() {
           </button>
 
           {/* Completed */}
+
           <button
             onClick={() => setActiveTab("completed")}
             className={`rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
@@ -890,6 +958,7 @@ export default function Bookings() {
           </button>
 
           {/* Cancelled */}
+
           <button
             onClick={() => setActiveTab("cancelled")}
             className={`rounded-lg px-3 py-3 text-sm font-medium transition-colors ${
@@ -997,6 +1066,10 @@ export default function Bookings() {
                 onCancel={handleCancelBooking}
                 onReview={setReviewingBooking}
                 justReviewed={justReviewed}
+                isSelected={
+                  String(booking.bookingId) ===
+                  String(selectedBookingId)
+                }
               />
             ))}
           </div>

@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
@@ -39,7 +40,11 @@ export default function Navbar() {
       user = JSON.parse(storedUser)
     }
   } catch (error) {
-    console.error('Invalid user data in localStorage:', error)
+    console.error(
+      'Invalid user data in localStorage:',
+      error
+    )
+
     localStorage.removeItem('user')
   }
 
@@ -128,7 +133,9 @@ export default function Navbar() {
     }
   }, [])
 
-  const markNotificationAsRead = async (notificationId) => {
+  const markNotificationAsRead = async (
+    notificationId
+  ) => {
     const token = localStorage.getItem('token')
 
     try {
@@ -143,7 +150,7 @@ export default function Navbar() {
       )
 
       if (!response.ok) {
-        return false
+        return
       }
 
       setNotifications((prev) =>
@@ -151,7 +158,7 @@ export default function Navbar() {
           notification.notificationId === notificationId
             ? {
                 ...notification,
-                isRead: true,
+                read: true,
               }
             : notification
         )
@@ -160,15 +167,11 @@ export default function Navbar() {
       setUnreadCount((prev) =>
         prev > 0 ? prev - 1 : 0
       )
-
-      return true
     } catch (error) {
       console.error(
         'Unable to mark notification as read:',
         error
       )
-
-      return false
     }
   }
 
@@ -193,7 +196,7 @@ export default function Navbar() {
       setNotifications((prev) =>
         prev.map((notification) => ({
           ...notification,
-          isRead: true,
+          read: true,
         }))
       )
 
@@ -206,9 +209,10 @@ export default function Navbar() {
     }
   }
 
-  // Handle notification click
+  // STEP 1:
+  // Open the exact booking related to the notification
   const handleNotificationClick = async (notification) => {
-    // Mark as read first
+    // Mark notification as read
     if (!notification.isRead) {
       await markNotificationAsRead(
         notification.notificationId
@@ -218,13 +222,20 @@ export default function Navbar() {
     // Close notification dropdown
     setShowNotifications(false)
 
-    // If notification is related to a booking,
-    // navigate to the correct booking page
+    // Open the exact booking
     if (notification.relatedBookingId) {
       if (loginMode === 'PROVIDER') {
-        navigate('/dashboard/provider/bookings')
+        navigate('/dashboard/provider/bookings', {
+          state: {
+            bookingId: notification.relatedBookingId,
+          },
+        })
       } else if (loginMode === 'CUSTOMER') {
-        navigate('/bookings')
+        navigate('/bookings', {
+          state: {
+            bookingId: notification.relatedBookingId,
+          },
+        })
       }
     }
   }
@@ -246,7 +257,7 @@ export default function Navbar() {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'NEW_BOOKING':
+      case 'BOOKING_REQUEST':
         return '🔔'
 
       case 'BOOKING_ACCEPTED':
@@ -258,8 +269,14 @@ export default function Navbar() {
       case 'BOOKING_CANCELLED':
         return '🚫'
 
+      case 'BOOKING_RESCHEDULED':
+        return '📅'
+
       case 'BOOKING_COMPLETED':
         return '🎉'
+
+      case 'REVIEW':
+        return '⭐'
 
       default:
         return '🔔'
@@ -303,6 +320,7 @@ export default function Navbar() {
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-6 text-sm text-ink/80">
 
+          {/* Public Links */}
           {publicLinks.map((link) => (
             <button
               key={link.path}
@@ -317,6 +335,7 @@ export default function Navbar() {
             </button>
           ))}
 
+          {/* Provider Links */}
           {isLoggedIn &&
             loginMode === 'PROVIDER' &&
             privateLinks.map((link) => (
@@ -333,6 +352,7 @@ export default function Navbar() {
               </button>
             ))}
 
+          {/* Customer Links */}
           {isLoggedIn &&
             loginMode === 'CUSTOMER' &&
             customerLinks.map((link) => (
@@ -349,6 +369,7 @@ export default function Navbar() {
               </button>
             ))}
 
+          {/* Dashboard */}
           {isLoggedIn && (
             <button
               onClick={() => navigate(dashboardPath)}
@@ -467,7 +488,6 @@ export default function Navbar() {
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-
                                   <p className="text-sm text-ink">
                                     {notification.message}
                                   </p>
@@ -477,7 +497,6 @@ export default function Navbar() {
                                       notification.createdAt
                                     )}
                                   </p>
-
                                 </div>
 
                                 {!notification.isRead && (
@@ -521,7 +540,9 @@ export default function Navbar() {
               {/* Login */}
               <button
                 onClick={() =>
-                  navigate('/role-select?intent=login')
+                  navigate(
+                    '/role-select?intent=login'
+                  )
                 }
                 className="text-sm font-medium text-primary border border-primary rounded-lg px-4 py-2 hover:bg-primaryLight transition-colors"
               >
@@ -531,7 +552,9 @@ export default function Navbar() {
               {/* Register */}
               <button
                 onClick={() =>
-                  navigate('/role-select?intent=signup')
+                  navigate(
+                    '/role-select?intent=signup'
+                  )
                 }
                 className="text-sm font-medium text-white bg-primary rounded-lg px-4 py-2 hover:bg-primaryDark transition-colors"
               >
@@ -545,3 +568,4 @@ export default function Navbar() {
     </header>
   )
 }
+
