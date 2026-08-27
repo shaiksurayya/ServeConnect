@@ -278,6 +278,9 @@ export default function Navbar() {
       case 'REVIEW':
         return '⭐'
 
+      case 'NEW_MESSAGE':
+        return '💬'
+
       default:
         return '🔔'
     }

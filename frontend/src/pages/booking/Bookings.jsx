@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import BookingChat from "../../components/chat/BookingChat";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080";
@@ -343,6 +344,7 @@ function BookingCard({
   onReschedule,
   onCancel,
   onReview,
+  onChat,
   justReviewed,
   isSelected,
 }) {
@@ -534,7 +536,15 @@ function BookingCard({
       )}
 
       {/* Actions */}
-      <div className="mt-5 pt-4 border-t border-line flex flex-wrap justify-end gap-3">
+      <div className="mt-5 pt-4 border-t border-line flex flex-wrap justify-end items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onChat(b)}
+          className="text-xs font-medium text-primary bg-primaryLight border border-primary/20 rounded-lg px-3 py-1.5 hover:bg-primary hover:text-white transition-colors flex items-center gap-1.5"
+        >
+          <span>💬</span> Chat with Provider
+        </button>
+
         {(b.status === "REQUESTED" ||
           b.status === "ACCEPTED") && (
           <>
@@ -594,6 +604,9 @@ export default function Bookings() {
     useState(null);
 
   const [reschedulingBooking, setReschedulingBooking] =
+    useState(null);
+
+  const [chattingBooking, setChattingBooking] =
     useState(null);
 
   const [justReviewed, setJustReviewed] =
@@ -1065,6 +1078,7 @@ export default function Bookings() {
                 onReschedule={setReschedulingBooking}
                 onCancel={handleCancelBooking}
                 onReview={setReviewingBooking}
+                onChat={setChattingBooking}
                 justReviewed={justReviewed}
                 isSelected={
                   String(booking.bookingId) ===
@@ -1101,6 +1115,17 @@ export default function Bookings() {
             setReviewingBooking(null)
           }
           onSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {/* ===================================================
+          CHAT MODAL
+      =================================================== */}
+
+      {chattingBooking && (
+        <BookingChat
+          booking={chattingBooking}
+          onClose={() => setChattingBooking(null)}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import StatCard from "../../components/ui/StatCard";
 import { useNavigate } from "react-router-dom";
+import BookingChat from "../../components/chat/BookingChat";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8080";
@@ -19,6 +20,7 @@ export default function ProviderDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [processingBookingId, setProcessingBookingId] = useState(null);
+  const [chattingBooking, setChattingBooking] = useState(null);
 
   useEffect(() => {
     fetchDashboard();
@@ -585,59 +587,64 @@ export default function ProviderDashboard() {
                     </div>
 
                     {/* Booking Actions */}
-                    {booking.status === "REQUESTED" && (
-                      <div className="flex gap-3 mt-4 md:mt-0">
+                    <div className="flex flex-wrap gap-2 mt-4 md:mt-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => setChattingBooking(booking)}
+                        className="bg-primaryLight text-primary hover:bg-primary hover:text-white px-3 py-2 rounded-lg text-xs font-medium border border-primary/20 transition-colors flex items-center gap-1"
+                      >
+                        <span>💬</span> Chat
+                      </button>
 
-                        {/* Accept */}
-                        <button
-                          type="button"
-                          disabled={isProcessing}
-                          onClick={() =>
-                            acceptBooking(booking.bookingId)
-                          }
-                          className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg ${
-                            isProcessing
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
-                        >
-                          {isProcessing
-                            ? "Processing..."
-                            : "Accept"}
-                        </button>
+                      {booking.status === "REQUESTED" && (
+                        <>
+                          {/* Accept */}
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() =>
+                              acceptBooking(booking.bookingId)
+                            }
+                            className={`bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                              isProcessing
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            {isProcessing
+                              ? "Processing..."
+                              : "Accept"}
+                          </button>
 
-                        {/* Reject */}
-                        <button
-                          type="button"
-                          disabled={isProcessing}
-                          onClick={() =>
-                            rejectBooking(booking.bookingId)
-                          }
-                          className={`bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg ${
-                            isProcessing
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
-                        >
-                          {isProcessing
-                            ? "Processing..."
-                            : "Reject"}
-                        </button>
+                          {/* Reject */}
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={() =>
+                              rejectBooking(booking.bookingId)
+                            }
+                            className={`bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+                              isProcessing
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
+                          >
+                            {isProcessing
+                              ? "Processing..."
+                              : "Reject"}
+                          </button>
+                        </>
+                      )}
 
-                      </div>
-                    )}
-
-                    {/* Complete */}
-                    {booking.status === "ACCEPTED" && (
-                      <div className="mt-4 md:mt-0">
-
+                      {/* Complete */}
+                      {booking.status === "ACCEPTED" && (
                         <button
                           type="button"
                           disabled={isProcessing}
                           onClick={() =>
                             completeBooking(booking.bookingId)
                           }
-                          className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg ${
+                          className={`bg-green-600 hover:bg-green-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                             isProcessing
                               ? "opacity-50 cursor-not-allowed"
                               : ""
@@ -647,9 +654,9 @@ export default function ProviderDashboard() {
                             ? "Processing..."
                             : "Mark as Completed"}
                         </button>
+                      )}
 
-                      </div>
-                    )}
+                    </div>
 
                   </div>
                 );
@@ -708,6 +715,14 @@ export default function ProviderDashboard() {
         </div>
 
       </div>
+
+      {/* CHAT MODAL */}
+      {chattingBooking && (
+        <BookingChat
+          booking={chattingBooking}
+          onClose={() => setChattingBooking(null)}
+        />
+      )}
     </div>
   );
 }
