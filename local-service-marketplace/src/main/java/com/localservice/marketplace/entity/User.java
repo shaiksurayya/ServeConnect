@@ -61,11 +61,18 @@ private Role role = Role.CUSTOMER;
     @Column(name = "address")
     private String address;
 
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        if (this.isActive == null) {
+            this.isActive = true;
+        }
     }
 }

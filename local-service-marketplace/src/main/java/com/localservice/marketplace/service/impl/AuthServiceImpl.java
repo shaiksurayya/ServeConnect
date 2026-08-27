@@ -84,6 +84,10 @@ System.out.println("LENGTH = " + request.getPhone().length());
             throw new RuntimeException("Invalid password.");
         }
 
+        if (Boolean.FALSE.equals(user.getIsActive())) {
+            throw new RuntimeException("Your account has been deactivated. Please contact support.");
+        }
+
         UserDetails userDetails = buildUserDetails(user);
         String token = jwtService.generateToken(userDetails);
 

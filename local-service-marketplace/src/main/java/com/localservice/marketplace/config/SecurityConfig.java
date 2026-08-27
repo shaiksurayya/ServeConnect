@@ -54,6 +54,10 @@ public class SecurityConfig {
                                 "/api/providers/**"
                         ).permitAll()
 
+                        // Admin endpoints
+                        .requestMatchers("/api/admin/**")
+                        .hasAuthority("ADMIN")
+
                         // Customer endpoints
                         .requestMatchers("/api/customer/**")
                         .hasAuthority("CUSTOMER")

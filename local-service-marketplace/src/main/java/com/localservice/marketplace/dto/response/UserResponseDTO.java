@@ -20,4 +20,6 @@ public class UserResponseDTO {
     private String phone;
     private String address;
     private Role role;
+    private Boolean isActive;
+    private java.time.LocalDateTime createdAt;
 }

@@ -51,6 +51,10 @@ public class ProviderProfileResponseDTO {
     private Long userId;
 
     private String userName;
+    private String userEmail;
+    private String userPhone;
+    private String userAddress;
+    private Boolean isActive;
 
     private Integer experience;
 

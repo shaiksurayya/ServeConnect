@@ -1,11 +1,13 @@
-package com.localservice.marketplace;
-
 import com.localservice.marketplace.entity.Category;
+import com.localservice.marketplace.entity.User;
+import com.localservice.marketplace.enums.Role;
 import com.localservice.marketplace.repository.CategoryRepository;
+import com.localservice.marketplace.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -49,6 +51,25 @@ public class LocalServiceMarketplaceApplication {
 
                     categoryRepository.save(category);
                 }
+            }
+        };
+    }
+
+    @Bean
+    CommandLineRunner initializeAdmin(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        return args -> {
+            if (!userRepository.existsByRole(Role.ADMIN)) {
+                User admin = User.builder()
+                        .name("Admin")
+                        .email("admin@serveconnect.com")
+                        .password(passwordEncoder.encode("admin123"))
+                        .phone("9999999999")
+                        .role(Role.ADMIN)
+                        .address("Admin HQ")
+                        .isActive(true)
+                        .build();
+
+                userRepository.save(admin);
             }
         };
     }
