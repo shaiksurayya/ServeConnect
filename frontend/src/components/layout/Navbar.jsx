@@ -22,6 +22,16 @@ const customerLinks = [
   { label: 'Bookings', path: '/bookings' },
 ]
 
+const adminLinks = [
+  { label: 'Overview', path: '/dashboard/admin?tab=overview' },
+  { label: 'Users', path: '/dashboard/admin?tab=users' },
+  { label: 'Providers', path: '/dashboard/admin?tab=providers' },
+  { label: 'Services', path: '/dashboard/admin?tab=services' },
+  { label: 'Categories', path: '/dashboard/admin?tab=categories' },
+  { label: 'Bookings', path: '/dashboard/admin?tab=bookings' },
+  { label: 'Reviews', path: '/dashboard/admin?tab=reviews' },
+]
+
 export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,6 +66,8 @@ export default function Navbar() {
       ? '/dashboard/customer'
       : loginMode === 'PROVIDER'
       ? '/dashboard/provider'
+      : loginMode === 'ADMIN'
+      ? '/dashboard/admin'
       : '/dashboard/customer'
 
   const fetchNotifications = async () => {
@@ -364,6 +376,23 @@ export default function Navbar() {
                 onClick={() => navigate(link.path)}
                 className={
                   location.pathname === link.path
+                    ? 'text-primary font-medium'
+                    : 'hover:text-primary transition-colors'
+                }
+              >
+                {link.label}
+              </button>
+            ))}
+
+          {/* Admin Links */}
+          {isLoggedIn &&
+            loginMode === 'ADMIN' &&
+            adminLinks.map((link) => (
+              <button
+                key={link.path}
+                onClick={() => navigate(link.path)}
+                className={
+                  (location.pathname + location.search) === link.path
                     ? 'text-primary font-medium'
                     : 'hover:text-primary transition-colors'
                 }
