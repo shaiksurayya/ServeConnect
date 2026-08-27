@@ -43,6 +43,7 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers("/api/notifications/**").authenticated()
+                        .requestMatchers("/api/bookings/*/messages/**", "/api/bookings/*/messages").authenticated()
 
                         // Public GET endpoints
                         .requestMatchers(
